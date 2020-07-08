@@ -134,15 +134,15 @@ def resize_1d(
     if scale is None and side is None:
         raise ValueError('One of scale or size must be specified!')
 
+    if side is None:
+        side = math.ceil(x.size(dim) * scale)
+
     # Identity case
-    if scale == 1 or side == x.size(dim):
+    if side == x.size(dim):
         return x
 
     # Default bicubic kernel
     kernel_size = 4
-
-    if side is None:
-        side = math.ceil(x.size(dim) * scale)
 
     with torch.no_grad():
         dside = torch.linspace(

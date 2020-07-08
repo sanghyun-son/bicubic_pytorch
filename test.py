@@ -1,5 +1,7 @@
 from os import path
 import unittest
+import imageio
+import numpy as np
 from scipy import io
 
 import core
@@ -29,6 +31,8 @@ class TestBicubic(unittest.TestCase):
         self.input_bottomright[..., 3, 2] = 1
         self.input_bottomright[..., 3, 0] = 100
 
+        self.butterfly = self.get_img(path.join('example', 'butterfly.png'))
+
         if cuda.is_available():
             self.test_cuda = True
             self.input_square_cuda = self.input_square.cuda()
@@ -36,12 +40,23 @@ class TestBicubic(unittest.TestCase):
             self.input_small_cuda = self.input_small.cuda()
             self.input_topleft_cuda = self.input_topleft.cuda()
             self.input_bottomright_cuda = self.input_bottomright.cuda()
+            self.butterfly_cuda = self.butterfly.cuda()
         else:
             self.test_cuda = False
 
         # You can use different functions for testing your implementation.
         self.imresize = core.imresize
-        self.eps = 1e-4
+        self.eps = 1e-3
+
+    def get_img(self, img_path: str) -> torch.Tensor:
+        img = imageio.imread(img_path)
+        img = np.transpose(img, (2, 0, 1))
+        img = torch.from_numpy(img)
+        while img.dim() < 4:
+            img.unsqueeze_(0)
+
+        img = img.float() / 255
+        return img
 
     def get_answer(self, case: str) -> torch.Tensor:
         mat = io.loadmat(path.join('test_answer', case + '.mat'))
@@ -56,8 +71,11 @@ class TestBicubic(unittest.TestCase):
 
     def check_diff(self, x: torch.Tensor, answer: str) -> float:
         y = self.get_answer(answer)
-        #print(x)
-        #print(y)
+        '''
+        if x.size(-1) > 100:
+            print(x[0, 0, :8, :8])
+            print(y[0, 0, :8, :8])
+        '''
         diff = torch.norm(x.cpu().float() - y.cpu().float(), 2).item()
         assert diff < self.eps, 'Difference is not negligible!: {}'.format(diff)
 
@@ -91,13 +109,13 @@ class TestBicubic(unittest.TestCase):
 
         self.check_diff(x, 'down_down_irregular_noaa')
 
-    def test_up_up_topleft(self) -> None:
+    def test_up_up_topleft_noaa(self) -> None:
         with timer.Timer('(4, 4) topleft to (5, 5) without AA: {}'):
             x = self.imresize(self.input_topleft, side=(5, 5))
 
         self.check_diff(x, 'up_up_topleft_noaa')
 
-    def test_cuda_up_up_topleft(self) -> None:
+    def test_cuda_up_up_topleft_noaa(self) -> None:
         if self.test_cuda is False:
             return
 
@@ -106,13 +124,13 @@ class TestBicubic(unittest.TestCase):
 
         self.check_diff(x, 'up_up_topleft_noaa')
 
-    def test_up_up_bottomright(self) -> None:
+    def test_up_up_bottomright_noaa(self) -> None:
         with timer.Timer('(4, 4) bottomright to (5, 5) without AA: {}'):
             x = self.imresize(self.input_bottomright, side=(5, 5))
 
         self.check_diff(x, 'up_up_bottomright_noaa')
 
-    def test_cuda_up_up_bottomright(self) -> None:
+    def test_cuda_up_up_bottomright_noaa(self) -> None:
         if self.test_cuda is False:
             return
 
@@ -121,13 +139,13 @@ class TestBicubic(unittest.TestCase):
 
         self.check_diff(x, 'up_up_bottomright_noaa')
 
-    def test_up_up_irregular(self) -> None:
+    def test_up_up_irregular_noaa(self) -> None:
         with timer.Timer('(8, 8) to (11, 13) without AA: {}'):
             x = self.imresize(self.input_square, side=(11, 13))
 
         self.check_diff(x, 'up_up_irregular_noaa')
 
-    def test_cuda_up_up_irregular(self) -> None:
+    def test_cuda_up_up_irregular_noaa(self) -> None:
         if self.test_cuda is False:
             return
 
@@ -135,6 +153,36 @@ class TestBicubic(unittest.TestCase):
             x = self.imresize(self.input_square_cuda, side=(11, 13))
 
         self.check_diff(x, 'up_up_irregular_noaa')
+
+    def test_down_down_butterfly_irregular_noaa(self) -> None:
+        with timer.Timer('(256, 256) butterfly to (123, 234) without AA: {}'):
+            x = self.imresize(self.butterfly, side=(123, 234))
+
+        self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+
+    def test_cuda_down_down_butterfly_irregular_noaa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with timer.Timer('(256, 256) butterfly to (123, 234) without AA using CUDA: {}'):
+            x = self.imresize(self.butterfly_cuda, side=(123, 234))
+
+        self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+
+    def test_up_up_butterfly_irregular_noaa(self) -> None:
+        with timer.Timer('(256, 256) butterfly to (1234, 789) without AA: {}'):
+            x = self.imresize(self.butterfly, side=(1234, 789))
+
+        self.check_diff(x, 'up_up_butterfly_irregular_noaa')
+
+    def test_cuda_up_up_butterfly_irregular_noaa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with timer.Timer('(256, 256) butterfly to (1234, 789) without AA using CUDA: {}'):
+            x = self.imresize(self.butterfly_cuda, side=(1234, 789))
+
+        self.check_diff(x, 'up_up_butterfly_irregular_noaa')
 
 
 if __name__ == '__main__':
