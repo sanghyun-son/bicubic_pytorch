@@ -92,7 +92,7 @@ From the left, input noise, optimized, and target images.
 
 ## Acknowledgement
 
-Thank you for below repositories for providing excellent insights:
+The repositories below have provided excellent insights.
 
 * [https://github.com/fatheral/matlab_imresize](https://github.com/fatheral/matlab_imresize)
 * [https://github.com/sefibk/KernelGAN](https://github.com/sefibk/KernelGAN)
