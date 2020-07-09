@@ -1,3 +1,25 @@
+'''
+A standalone PyTorch implementation for fast and efficient bicubic resampling.
+The resulting values will be the same to MATLAB function imresize('bicubic').
+
+## Author:      Sanghyun Son
+## Email:       sonsang35@gmail.com (primary), thstkdgus35@snu.ac.kr (secondary)
+## Version:     1.0.0
+## Last update: July 9th, 2020 (KST)
+
+Depencency: torch
+
+Example::
+>>> import torch
+>>> import core
+>>> x = torch.arange(16).float().view(1, 1, 4, 4)
+>>> y = core.imresize(x, side=(3, 3))
+>>> print(y)
+tensor([[[[ 0.7506,  2.1004,  3.4503],
+          [ 6.1505,  7.5000,  8.8499],
+          [11.5497, 12.8996, 14.2494]]]])
+'''
+
 import math
 import typing
 
@@ -172,6 +194,8 @@ def resize_1d(
     # We allow margin to both sides
     kernel_size += 2
 
+    # Weights only depend on the shape of input and output,
+    # so we do not calculate gradients here.
     with torch.no_grad():
         dside = torch.linspace(
             start=0, end=1, steps=(2 * side) + 1, device=x.device,
@@ -180,15 +204,14 @@ def resize_1d(
         dside = x.size(dim) * dside - 0.5
         doffset = dside.floor() - (kernel_size // 2) + 1
         dist = dside - doffset
-        #print(dside, doffset, dist)
         weight = get_weight(
             dist, kernel_size, antialiasing_factor=antialiasing_factor,
         )
-        #print(weight)
         pad_pre, pad_post, doffset = get_padding(
             doffset, kernel_size, x.size(dim),
         )
 
+    # To backpropagate through x
     unfold = reshape_tensor(x, dim, pad_pre, pad_post, kernel_size)
     # Subsampling first
     if dim == 2 or dim == -2:

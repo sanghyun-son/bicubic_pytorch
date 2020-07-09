@@ -68,3 +68,6 @@ target/
 # Temp files
 *.swp
 *.m~
+
+# Output images
+*.png
