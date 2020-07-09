@@ -17,17 +17,47 @@ input_bottomright(3, 4) = 10;
 input_bottomright(4, 3) = 1;
 input_bottomright(4, 1) = 100;
 
+
+fprintf('(4, 4) to (3, 3) without AA\n');
+down_down_small_noaa = imresize( ...
+    input_small, [3, 3], 'bicubic', 'antialiasing', false ...
+);
+save('down_down_small_noaa.mat', 'down_down_small_noaa');
+
+fprintf('(4, 4) to (3, 3) with AA\n');
+down_down_small_aa = imresize( ...
+    input_small, [3, 3], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_small_aa.mat', 'down_down_small_aa');
+
+
 fprintf('(8, 8) to (3, 4) without AA\n');
 down_down_noaa = imresize( ...
     input_square, [3, 4], 'bicubic', 'antialiasing', false ...
 );
 save('down_down_noaa.mat', 'down_down_noaa');
 
+fprintf('(8, 8) to (3, 4) with AA\n');
+down_down_aa = imresize( ...
+    input_square, [3, 4], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_aa.mat', 'down_down_aa');
+%disp(input_square);
+%disp(down_down_aa);
+
 fprintf('(8, 8) to (5, 7) without AA\n');
 down_down_irregular_noaa = imresize( ...
     input_square, [5, 7], 'bicubic', 'antialiasing', false ...
 );
 save('down_down_irregular_noaa.mat', 'down_down_irregular_noaa');
+
+fprintf('(8, 8) to (5, 7) with AA\n');
+down_down_irregular_aa = imresize( ...
+    input_square, [5, 7], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_irregular_aa.mat', 'down_down_irregular_aa');
+%disp(input_square);
+%disp(down_down_irregular_aa);
 
 fprintf('(4, 4) topleft to (5, 5) without AA\n');
 up_up_topleft_noaa = imresize( ...

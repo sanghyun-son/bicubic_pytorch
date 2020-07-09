@@ -21,6 +21,9 @@ def cubic_contribution(x: torch.Tensor, a: float=-0.5) -> torch.Tensor:
     res = res_01 + res_12
     return res
 
+def gaussian_contribution(x: torch.Tensor, sigma: float=2.0) -> torch.Tensor:
+    pass
+
 def reflect_padding(
         x: torch.Tensor, dim: int, pad_pre: int, pad_post: int) -> torch.Tensor:
 
@@ -77,12 +80,23 @@ def get_padding(
 
     return pad_pre, pad_post, doffset
 
-def get_weight(dist: torch.Tensor, kernel_size: int) -> torch.Tensor:
+def get_weight(
+        dist: torch.Tensor,
+        kernel_size: int,
+        kernel='cubic',
+        antialiasing_factor: float=1) -> torch.Tensor:
+
     buffer_pos = dist.new_zeros(kernel_size, len(dist))
     for idx, buffer_sub in enumerate(buffer_pos):
         buffer_sub.copy_(dist - idx)
 
-    weight = cubic_contribution(buffer_pos)
+    # Expand (downsampling) / Shrink (upsampling) the receptive field.
+    buffer_pos *= antialiasing_factor
+    if kernel == 'cubic':
+        weight = cubic_contribution(buffer_pos)
+    else:
+        raise ValueError('{} kernel is not supported!'.format(kernel))
+
     weight /= weight.sum(dim=0, keepdim=True)
     return weight
 
@@ -119,7 +133,8 @@ def resize_1d(
         x: torch.Tensor,
         dim: int,
         scale: float=None,
-        side: int=None) -> torch.Tensor:
+        side: int=None,
+        antialiasing: bool=True) -> torch.Tensor:
 
     '''
     Args:
@@ -141,8 +156,16 @@ def resize_1d(
     if side == x.size(dim):
         return x
 
-    # Default bicubic kernel
+    # Default bicubic kernel with antialiasing
     kernel_size = 4
+    if antialiasing:
+        antialiasing_factor = side / x.size(dim)
+        kernel_size = math.ceil(kernel_size / antialiasing_factor)
+    else:
+        antialiasing_factor = 1
+
+    # We allow margin to both sides
+    kernel_size += 2
 
     with torch.no_grad():
         dside = torch.linspace(
@@ -153,7 +176,9 @@ def resize_1d(
         doffset = dside.floor() - (kernel_size // 2) + 1
         dist = dside - doffset
         #print(dside, doffset, dist)
-        weight = get_weight(dist, kernel_size)
+        weight = get_weight(
+            dist, kernel_size, antialiasing_factor=antialiasing_factor,
+        )
         #print(weight)
         pad_pre, pad_post, doffset = get_padding(
             doffset, kernel_size, x.size(dim),
@@ -177,7 +202,13 @@ def imresize(
         x: torch.Tensor,
         scale: int=None,
         side: typing.Tuple[int, int]=None,
-        ) -> torch.Tensor:
+        antialiasing: bool=True) -> torch.Tensor:
+
+    '''
+    Args:
+
+    Return:
+    '''
 
     if scale is None and side is None:
         raise ValueError('One of scale or size must be specified!')
@@ -204,24 +235,25 @@ def imresize(
         side = (math.ceil(h * scale), math.ceil(w * scale))
 
     # Core resizing module
-    x = resize_1d(x, 2, scale=None, side=side[0])
-    x = resize_1d(x, 3, scale=None, side=side[1])
+    x = resize_1d(x, 2, scale=None, side=side[0], antialiasing=antialiasing)
+    x = resize_1d(x, 3, scale=None, side=side[1], antialiasing=antialiasing)
 
     rh = x.size(-2)
     rw = x.size(-1)
-    # Back to original dimension
+    # Back to the original dimension
     if b is not None:
-        x = x.view(b, c, rh, rw)
+        x = x.view(b, c, rh, rw)        # 4-dim
     else:
         if c is not None:
-            x = x.view(c, rh, rw)
+            x = x.view(c, rh, rw)       # 3-dim
         else:
-            x = x.view(rh, rw)
+            x = x.view(rh, rw)          # 2-dim
 
     if dtype is not None:
         if not dtype.is_floating_point:
             x = x.round()
 
+        # To prevent over/underflow when converting types
         if dtype is torch.uint8:
             x = x.clamp(0, 255)
 
@@ -230,9 +262,10 @@ def imresize(
     return x
 
 if __name__ == '__main__':
+    # Just for debugging
     torch.set_printoptions(precision=5, sci_mode=False, edgeitems=16, linewidth=200)
-    #a = torch.arange(64).float().view(1, 1, 8, 8)
-    a = torch.arange(16).float().view(1, 1, 4, 4)
+    a = torch.arange(64).float().view(1, 1, 8, 8)
+    #a = torch.arange(16).float().view(1, 1, 4, 4)
     '''
     a = torch.zeros(1, 1, 4, 4)
     a[..., 0, 0] = 100
@@ -245,8 +278,10 @@ if __name__ == '__main__':
     a[..., -1, -2] = 1
     a[..., -1, 0] = 100
     '''
-    b = imresize(a, side=(5, 5))
-    print(a)
-    print(b)
+    #b = imresize(a, side=(3, 8), antialiasing=False)
+    c = imresize(a, side=(3, 8), antialiasing=True)
+    #print(a)
+    #print(b)
+    print(c)
     #print(b[..., 1:-1, 1:-1])
 
