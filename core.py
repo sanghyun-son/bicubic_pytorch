@@ -13,7 +13,7 @@ Example::
 >>> import torch
 >>> import core
 >>> x = torch.arange(16).float().view(1, 1, 4, 4)
->>> y = core.imresize(x, side=(3, 3))
+>>> y = core.imresize(x, sides=(3, 3))
 >>> print(y)
 tensor([[[[ 0.7506,  2.1004,  3.4503],
           [ 6.1505,  7.5000,  8.8499],
