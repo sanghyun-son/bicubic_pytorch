@@ -228,8 +228,8 @@ def resize_1d(
 
 def imresize(
         x: torch.Tensor,
-        scale: int=None,
-        side: typing.Tuple[int, int]=None,
+        scale: float=None,
+        sides: typing.Tuple[int, int]=None,
         antialiasing: bool=True) -> torch.Tensor:
 
     '''
@@ -238,7 +238,7 @@ def imresize(
     Return:
     '''
 
-    if scale is None and side is None:
+    if scale is None and sides is None:
         raise ValueError('One of scale or size must be specified!')
 
     if x.dim() == 4:
@@ -259,12 +259,12 @@ def imresize(
     else:
         dtype = None
 
-    if side is None:
-        side = (math.ceil(h * scale), math.ceil(w * scale))
+    if sides is None:
+        sides = (math.ceil(h * scale), math.ceil(w * scale))
 
     # Core resizing module
-    x = resize_1d(x, 2, scale=None, side=side[0], antialiasing=antialiasing)
-    x = resize_1d(x, 3, scale=None, side=side[1], antialiasing=antialiasing)
+    x = resize_1d(x, 2, scale=None, side=sides[0], antialiasing=antialiasing)
+    x = resize_1d(x, 3, scale=None, side=sides[1], antialiasing=antialiasing)
 
     rh = x.size(-2)
     rw = x.size(-1)
@@ -306,8 +306,8 @@ if __name__ == '__main__':
     a[..., -1, -2] = 1
     a[..., -1, 0] = 100
     '''
-    #b = imresize(a, side=(3, 8), antialiasing=False)
-    c = imresize(a, side=(11, 13), antialiasing=True)
+    #b = imresize(a, sides=(3, 8), antialiasing=False)
+    c = imresize(a, sides=(11, 13), antialiasing=True)
     #print(a)
     #print(b)
     print(c)
