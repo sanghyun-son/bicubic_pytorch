@@ -12,5 +12,5 @@ class Timer(object):
 
     def __exit__(self, *args, **kwargs):
         toc = time.time() - self.tic
-        print(self.msg.format(toc))
+        print('\n' + self.msg.format(toc))
 

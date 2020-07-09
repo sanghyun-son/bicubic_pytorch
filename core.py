@@ -147,19 +147,24 @@ def resize_1d(
     '''
 
     if scale is None and side is None:
-        raise ValueError('One of scale or size must be specified!')
+        raise ValueError('One of scale or side must be specified!')
+
+    if scale is not None and side is not None:
+        raise ValueError('Please specify scale or side to avoid conflict!')
 
     if side is None:
         side = math.ceil(x.size(dim) * scale)
+    else:
+        scale = side / x.size(dim)
 
     # Identity case
-    if side == x.size(dim):
+    if scale == 1:
         return x
 
-    # Default bicubic kernel with antialiasing
+    # Default bicubic kernel with antialiasing (only when downsampling)
     kernel_size = 4
-    if antialiasing:
-        antialiasing_factor = side / x.size(dim)
+    if antialiasing and (scale < 1):
+        antialiasing_factor = scale
         kernel_size = math.ceil(kernel_size / antialiasing_factor)
     else:
         antialiasing_factor = 1
@@ -279,7 +284,7 @@ if __name__ == '__main__':
     a[..., -1, 0] = 100
     '''
     #b = imresize(a, side=(3, 8), antialiasing=False)
-    c = imresize(a, side=(3, 8), antialiasing=True)
+    c = imresize(a, side=(11, 13), antialiasing=True)
     #print(a)
     #print(b)
     print(c)

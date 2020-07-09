@@ -85,6 +85,8 @@ class TestBicubic(unittest.TestCase):
             raise ArithmeticError(
                 'Difference is not negligible!: {}'.format(diff),
             )
+        else:
+            print('Allowable difference: {:.4e} < {:.4e}'.format(diff, self.eps))
 
     def test_down_down_small_noaa(self) -> None:
         with timer.Timer('(4, 4) to (3, 3) without AA: {}'):
@@ -238,6 +240,25 @@ class TestBicubic(unittest.TestCase):
 
         self.check_diff(x, 'up_up_irregular_noaa')
 
+    def test_up_up_irregular_aa(self) -> None:
+        with timer.Timer('(8, 8) to (11, 13) with AA: {}'):
+            x = self.imresize(
+                self.input_square, side=(11, 13), antialiasing=True,
+            )
+
+        self.check_diff(x, 'up_up_irregular_aa')
+
+    def test_cuda_up_up_irregular_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with timer.Timer('(8, 8) to (11, 13) with AA using CUDA: {}'):
+            x = self.imresize(
+                self.input_square_cuda, side=(11, 13), antialiasing=True,
+            )
+
+        self.check_diff(x, 'up_up_irregular_aa')
+
     def test_down_down_butterfly_irregular_noaa(self) -> None:
         with timer.Timer('(256, 256) butterfly to (123, 234) without AA: {}'):
             x = self.imresize(
@@ -256,6 +277,25 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+
+    def test_down_down_butterfly_irregular_aa(self) -> None:
+        with timer.Timer('(256, 256) butterfly to (123, 234) with AA: {}'):
+            x = self.imresize(
+                self.butterfly, side=(123, 234), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_butterfly_irregular_aa')
+
+    def test_cuda_down_down_butterfly_irregular_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with timer.Timer('(256, 256) butterfly to (123, 234) with AA using CUDA: {}'):
+            x = self.imresize(
+                self.butterfly_cuda, side=(123, 234), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_butterfly_irregular_aa')
 
     def test_up_up_butterfly_irregular_noaa(self) -> None:
         with timer.Timer('(256, 256) butterfly to (1234, 789) without AA: {}'):
