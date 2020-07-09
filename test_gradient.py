@@ -46,11 +46,12 @@ class TestGradient(unittest.TestCase):
             loss = F.mse_loss(noise_up, self.target)
             loss.backward()
             if i == 0 or (i + 1) % 20 == 0:
-                print('Iter {:0>4}\tLoss: {}'.format(i + 1, loss.item()))
+                print('Iter {:0>4}\tLoss: {:.8f}'.format(i + 1, loss.item()))
 
             optimizer.step()
 
         utils.save_img(noise_p, path.join('example', 'noise_optimized.png'))
+        assert loss.item() < 1e-2, 'Failed to optimize!'
 
 
 if __name__ == '__main__':

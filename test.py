@@ -61,7 +61,7 @@ class TestBicubic(unittest.TestCase):
         y = self.get_answer(answer)
         diff = torch.norm(x.cpu().float() - y.cpu().float(), 2).item()
         if diff > self.eps:
-            print('Implmentation:')
+            print('Implementation:')
             print(x)
             print('MATLAB reference:')
             print(y)
