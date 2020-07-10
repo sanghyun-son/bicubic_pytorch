@@ -160,7 +160,6 @@ def reshape_tensor(
 def resize_1d(
         x: torch.Tensor,
         dim: int,
-        scale: float=None,
         side: int=None,
         kernel: str='cubic',
         sigma: float=2.0,
@@ -176,18 +175,7 @@ def resize_1d(
 
     Return:
     '''
-
-    if scale is None and side is None:
-        raise ValueError('One of scale or side must be specified!')
-
-    if scale is not None and side is not None:
-        raise ValueError('Please specify scale or side to avoid conflict!')
-
-    if side is None:
-        side = math.ceil(x.size(dim) * scale)
-    else:
-        scale = side / x.size(dim)
-
+    scale = side / x.size(dim)
     # Identity case
     if scale == 1:
         return x
@@ -224,7 +212,6 @@ def resize_1d(
             sigma=sigma,
             antialiasing_factor=antialiasing_factor,
         )
-        print(weight)
         pad_pre, pad_post, base = get_padding(base, kernel_size, x.size(dim))
 
     # To backpropagate through x
@@ -249,19 +236,30 @@ def imresize(
         scale: float=None,
         sides: typing.Tuple[int, int]=None,
         kernel: str='cubic',
-        sigma: float=2.0,
+        sigma: float=2,
         rotation_degree: float=0,
         padding_type: str='reflect',
         antialiasing: bool=True) -> torch.Tensor:
 
     '''
     Args:
+        x (torch.Tensor):
+        scale (float):
+        sides (tuple(int, int)):
+        kernel (str, default='cubic'):
+        sigma (float, default=2):
+        rotation_degree (float, default=0):
+        padding_type (str, default='reflect'):
+        antialiasing (bool, default=True):
 
     Return:
+        torch.Tensor:
     '''
 
     if scale is None and sides is None:
         raise ValueError('One of scale or size must be specified!')
+    if scale is not None and side is not None:
+        raise ValueError('Please specify scale or side to avoid conflict!')
 
     if x.dim() == 4:
         b, c, h, w = x.size()
@@ -275,14 +273,16 @@ def imresize(
         raise ValueError('{}-dim Tensor is not supported!'.format(x.dim()))
 
     x = x.view(-1, 1, h, w)
+
+    # Determine output size
+    if sides is None:
+        sides = (math.ceil(h * scale), math.ceil(w * scale))
+
     if x.dtype != torch.float32:
         dtype = x.dtype
         x = x.float()
     else:
         dtype = None
-
-    if sides is None:
-        sides = (math.ceil(h * scale), math.ceil(w * scale))
 
     # Shared keyword arguments across dimensions
     kwargs = {
@@ -292,8 +292,8 @@ def imresize(
         'antialiasing': antialiasing,
     }
     # Core resizing module
-    x = resize_1d(x, -2, scale=None, side=sides[0], **kwargs)
-    x = resize_1d(x, -1, scale=None, side=sides[1], **kwargs)
+    x = resize_1d(x, -2, side=sides[0], **kwargs)
+    x = resize_1d(x, -1, side=sides[1], **kwargs)
 
     rh = x.size(-2)
     rw = x.size(-1)
@@ -309,7 +309,6 @@ def imresize(
     if dtype is not None:
         if not dtype.is_floating_point:
             x = x.round()
-
         # To prevent over/underflow when converting types
         if dtype is torch.uint8:
             x = x.clamp(0, 255)
