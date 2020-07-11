@@ -257,9 +257,9 @@ def imresize(
     '''
 
     if scale is None and sides is None:
-        raise ValueError('One of scale or size must be specified!')
-    if scale is not None and side is not None:
-        raise ValueError('Please specify scale or side to avoid conflict!')
+        raise ValueError('One of scale or sides must be specified!')
+    if scale is not None and sides is not None:
+        raise ValueError('Please specify scale or sides to avoid conflict!')
 
     if x.dim() == 4:
         b, c, h, w = x.size()
