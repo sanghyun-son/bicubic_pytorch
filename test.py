@@ -10,12 +10,16 @@ from torch import cuda
 
 
 class TestBicubic(unittest.TestCase):
+    '''
+    Why do we have to split CUDA?
+    '''
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.input_small = torch.arange(16).view(1, 1, 4, 4).float()
         self.input_square = torch.arange(64).view(1, 1, 8, 8).float()
         self.input_rect = torch.arange(80).view(1, 1, 8, 10).float()
+        self.input_15x15 = torch.arange(225).view(1, 1, 15, 15).float()
         
         self.input_topleft = torch.zeros(1, 1, 4, 4).float()
         self.input_topleft[..., 0, 0] = 100
@@ -33,9 +37,10 @@ class TestBicubic(unittest.TestCase):
 
         if cuda.is_available():
             self.test_cuda = True
+            self.input_small_cuda = self.input_small.cuda()
             self.input_square_cuda = self.input_square.cuda()
             self.input_rect_cuda = self.input_rect.cuda()
-            self.input_small_cuda = self.input_small.cuda()
+            self.input_15x15_cuda = self.input_15x15.cuda()
             self.input_topleft_cuda = self.input_topleft.cuda()
             self.input_bottomright_cuda = self.input_bottomright.cuda()
             self.butterfly_cuda = self.butterfly.cuda()
@@ -58,8 +63,8 @@ class TestBicubic(unittest.TestCase):
         return tensor
 
     def check_diff(self, x: torch.Tensor, answer: str) -> float:
-        y = self.get_answer(answer)
-        diff = torch.norm(x.cpu().float() - y.cpu().float(), 2).item()
+        y = self.get_answer(answer).to(dtype=x.dtype, device=x.device)
+        diff = torch.norm(x - y, 2).item()
         if diff > self.eps:
             print('Implementation:')
             print(x)
@@ -166,6 +171,82 @@ class TestBicubic(unittest.TestCase):
 
         self.check_diff(x, 'down_down_irregular_noaa')
 
+    def test_down_down_x2_aa(self) -> None:
+        with utils.Timer('(8, 8) to (4, 4) with AA: {}'):
+            x = self.imresize(
+                self.input_square, sides=(4, 4), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x2_aa')
+
+    def test_cuda_down_down_x2_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with utils.Timer('(8, 8) to (4, 4) with AA using CUDA: {}'):
+            x = self.imresize(
+                self.input_square_cuda, sides=(4, 4), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x2_aa')
+
+    def test_down_down_x3_aa(self) -> None:
+        with utils.Timer('(15, 15) to (5, 5) with AA: {}'):
+            x = self.imresize(
+                self.input_15x15, sides=(5, 5), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x3_aa')
+
+    def test_cuda_down_down_x3_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with utils.Timer('(15, 15) to (5, 5) with AA using CUDA: {}'):
+            x = self.imresize(
+                self.input_15x15_cuda, sides=(5, 5), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x3_aa')
+
+    def test_down_down_x4_aa(self) -> None:
+        with utils.Timer('(8, 8) to (2, 2) with AA: {}'):
+            x = self.imresize(
+                self.input_square, sides=(2, 2), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x4_aa')
+
+    def test_cuda_down_down_x4_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with utils.Timer('(8, 8) to (2, 2) with AA using CUDA: {}'):
+            x = self.imresize(
+                self.input_square_cuda, sides=(2, 2), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x4_aa')
+
+    def test_down_down_x5_aa(self) -> None:
+        with utils.Timer('(15, 15) to (3, 3) with AA: {}'):
+            x = self.imresize(
+                self.input_15x15, sides=(3, 3), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x5_aa')
+
+    def test_cuda_down_down_x5_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        with utils.Timer('(15, 15) to (3, 3) with AA using CUDA: {}'):
+            x = self.imresize(
+                self.input_15x15_cuda, sides=(3, 3), antialiasing=True,
+            )
+
+        self.check_diff(x, 'down_down_x5_aa')
+
     def test_up_up_topleft_noaa(self) -> None:
         with utils.Timer('(4, 4) topleft to (5, 5) without AA: {}'):
             x = self.imresize(
@@ -258,6 +339,23 @@ class TestBicubic(unittest.TestCase):
             x = self.imresize(
                 self.butterfly_cuda, sides=(123, 234), antialiasing=False,
             )
+
+        self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+
+    def test_double_down_down_butterfly_irregular_noaa(self) -> None:
+        double = self.butterfly.double()
+        with utils.Timer('(256, 256) butterfly (double) to (123, 234) without AA: {}'):
+            x = self.imresize(double, sides=(123, 234), antialiasing=False)
+
+        self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+
+    def test_double_cuda_down_down_butterfly_irregular_noaa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        double = self.butterfly_cuda.double()
+        with utils.Timer('(256, 256) butterfly (double) to (123, 234) without AA using CUDA: {}'):
+            x = self.imresize(double, sides=(123, 234), antialiasing=False)
 
         self.check_diff(x, 'down_down_butterfly_irregular_noaa')
 

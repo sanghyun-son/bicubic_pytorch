@@ -5,6 +5,9 @@ input_square = reshape(input_square, [8, 8])';
 input_small = linspace(0, 15, 16);
 input_small = reshape(input_small, [4, 4])';
 
+input_15x15 = linspace(0, 224, 225);
+input_15x15 = reshape(input_15x15, [15, 15])';
+
 input_topleft = zeros(4, 4);
 input_topleft(1, 1) = 100;
 input_topleft(2, 1) = 10;
@@ -112,3 +115,29 @@ save( ...
     'up_up_butterfly_irregular_noaa.mat', ...
     'up_up_butterfly_irregular_noaa' ...
 );
+
+
+fprintf('(8, 8) to (4, 4) with AA\n');
+down_down_x2_aa = imresize( ...
+    input_square, [4, 4], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_x2_aa.mat', 'down_down_x2_aa');
+
+fprintf('(8, 8) to (2, 2) with AA\n');
+down_down_x4_aa = imresize( ...
+    input_square, [2, 2], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_x4_aa.mat', 'down_down_x4_aa');
+
+
+fprintf('(15, 15) to (5, 5) with AA\n');
+down_down_x3_aa = imresize( ...
+    input_15x15, [5, 5], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_x3_aa.mat', 'down_down_x3_aa');
+
+fprintf('(15, 15) to (3, 3) with AA\n');
+down_down_x5_aa = imresize( ...
+    input_15x15, [3, 3], 'bicubic', 'antialiasing', true ...
+);
+save('down_down_x5_aa.mat', 'down_down_x5_aa');
