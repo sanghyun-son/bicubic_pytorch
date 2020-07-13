@@ -62,8 +62,7 @@ class TestBicubic(unittest.TestCase):
 
         return tensor
 
-    def check_diff(self, x: torch.Tensor, answer: str) -> float:
-        y = self.get_answer(answer).to(dtype=x.dtype, device=x.device)
+    def _check_diff(self, x: torch.Tensor, y: torch.Tensor) -> None:
         diff = torch.norm(x - y, 2).item()
         if diff > self.eps:
             print('Implementation:')
@@ -76,6 +75,156 @@ class TestBicubic(unittest.TestCase):
         else:
             print('Allowable difference: {:.4e} < {:.4e}'.format(diff, self.eps))
 
+        return
+
+    def check_diff(self, x: torch.Tensor, answer: str) -> None:
+        y = self.get_answer(answer).to(dtype=x.dtype, device=x.device)
+        self._check_diff(x, y)
+        return
+
+    def test_consistency_down_down_x4_large_noaa(self) -> None:
+        x = torch.randn(1, 3, 2048, 2048)
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'without AA (Cubic Conv. vs. Naive): {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=False)
+            y = self.imresize(x, sides=(512, 512), antialiasing=False)
+
+        self._check_diff(x, y)
+        return
+
+    def test_cuda_consistency_down_down_x4_large_noaa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        x = torch.randn(1, 3, 2048, 2048).cuda()
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'without AA (Cubic Conv. vs. Naive) using CUDA: {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=False)
+            y = self.imresize(x, sides=(512, 512), antialiasing=False)
+
+        self._check_diff(x, y)
+        return
+
+    def test_consistency_down_down_x4_large_aa(self) -> None:
+        x = torch.randn(1, 3, 2048, 2048)
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'with AA (Cubic Conv. vs. Naive): {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=True)
+            y = self.imresize(x, sides=(512, 512), antialiasing=True)
+
+        self._check_diff(x, y)
+        return
+
+    def test_cuda_consistency_down_down_x4_large_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        x = torch.randn(1, 3, 2048, 2048).cuda()
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'with AA (Cubic Conv. vs. Naive) using CUDA: {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=True)
+            y = self.imresize(x, sides=(512, 512), antialiasing=True)
+
+        self._check_diff(x, y)
+        return
+
+    def test_down_down_x4_large_noaa(self) -> None:
+        x = torch.randn(1, 3, 2048, 2048)
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) without AA (Cubic Conv.): {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=False)
+
+        return
+
+    def test_cuda_down_down_x4_large_noaa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        x = torch.randn(1, 3, 2048, 2048).cuda()
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'without AA using CUDA (Cubic Conv.): {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=False)
+
+        return
+
+    def test_down_down_x4_naive_large_noaa(self) -> None:
+        x = torch.randn(1, 3, 2048, 2048)
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'without AA (Naive): {}'):
+
+            x = self.imresize(x, sides=(512, 512), antialiasing=False)
+
+        return
+
+    def test_cuda_down_down_x4_naive_large_noaa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        x = torch.randn(1, 3, 2048, 2048).cuda()
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'without AA using CUDA (Naive): {}'):
+
+            x = self.imresize(x, sides=(512, 512), antialiasing=False)
+
+        return
+
+    def test_down_down_x4_large_aa(self) -> None:
+        x = torch.randn(1, 3, 2048, 2048)
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) with AA (Cubic Conv.): {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=True)
+
+        return
+
+    def test_cuda_down_down_x4_large_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        x = torch.randn(1, 3, 2048, 2048).cuda()
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'with AA using CUDA (Cubic Conv.): {}'):
+
+            x = self.imresize(x, scale=0.25, antialiasing=True)
+
+        return
+
+    def test_down_down_x4_naive_large_aa(self) -> None:
+        x = torch.randn(1, 3, 2048, 2048)
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) with AA (Naive): {}'):
+
+            x = self.imresize(x, sides=(512, 512), antialiasing=True)
+
+        return
+
+    def test_cuda_down_down_x4_naive_large_aa(self) -> None:
+        if self.test_cuda is False:
+            return
+
+        x = torch.randn(1, 3, 2048, 2048).cuda()
+        with utils.Timer(
+                '(2048, 2048) RGB to (512, 512) '
+                'with AA using CUDA (Naive): {}'):
+
+            x = self.imresize(x, sides=(512, 512), antialiasing=True)
+
+        return
+
     def test_down_down_small_noaa(self) -> None:
         with utils.Timer('(4, 4) to (3, 3) without AA: {}'):
             x = self.imresize(
@@ -83,6 +232,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_small_noaa')
+        return
 
     def test_cuda_down_down_small_noaa(self) -> None:
         if self.test_cuda is False:
@@ -94,6 +244,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_small_noaa')
+        return
 
     def test_down_down_small_aa(self) -> None:
         with utils.Timer('(4, 4) to (3, 3) with AA: {}'):
@@ -102,6 +253,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_small_aa')
+        return
 
     def test_cuda_down_down_small_aa(self) -> None:
         if self.test_cuda is False:
@@ -113,6 +265,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_small_aa')
+        return
 
     def test_down_down_noaa(self) -> None:
         with utils.Timer('(8, 8) to (3, 4) without AA: {}'):
@@ -121,6 +274,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_noaa')
+        return
 
     def test_cuda_down_down_noaa(self) -> None:
         if self.test_cuda is False:
@@ -132,6 +286,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_noaa')
+        return
 
     def test_down_down_aa(self) -> None:
         with utils.Timer('(8, 8) to (3, 4) with AA: {}'):
@@ -140,6 +295,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_aa')
+        return
 
     def test_cuda_down_down_aa(self) -> None:
         if self.test_cuda is False:
@@ -151,6 +307,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_aa')
+        return
 
     def test_down_down_irregular_noaa(self) -> None:
         with utils.Timer('(8, 8) to (5, 7) without AA: {}'):
@@ -159,6 +316,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_irregular_noaa')
+        return
 
     def test_cuda_down_down_irregular_noaa(self) -> None:
         if self.test_cuda is False:
@@ -170,14 +328,16 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_irregular_noaa')
+        return
 
     def test_down_down_x2_aa(self) -> None:
         with utils.Timer('(8, 8) to (4, 4) with AA: {}'):
             x = self.imresize(
-                self.input_square, sides=(4, 4), antialiasing=True,
+                self.input_square, scale=(1 / 2), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x2_aa')
+        return
 
     def test_cuda_down_down_x2_aa(self) -> None:
         if self.test_cuda is False:
@@ -185,18 +345,20 @@ class TestBicubic(unittest.TestCase):
 
         with utils.Timer('(8, 8) to (4, 4) with AA using CUDA: {}'):
             x = self.imresize(
-                self.input_square_cuda, sides=(4, 4), antialiasing=True,
+                self.input_square_cuda, scale=(1 / 2), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x2_aa')
+        return
 
     def test_down_down_x3_aa(self) -> None:
         with utils.Timer('(15, 15) to (5, 5) with AA: {}'):
             x = self.imresize(
-                self.input_15x15, sides=(5, 5), antialiasing=True,
+                self.input_15x15, scale=(1 / 3), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x3_aa')
+        return
 
     def test_cuda_down_down_x3_aa(self) -> None:
         if self.test_cuda is False:
@@ -204,18 +366,20 @@ class TestBicubic(unittest.TestCase):
 
         with utils.Timer('(15, 15) to (5, 5) with AA using CUDA: {}'):
             x = self.imresize(
-                self.input_15x15_cuda, sides=(5, 5), antialiasing=True,
+                self.input_15x15_cuda, scale=(1 / 3), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x3_aa')
+        return
 
     def test_down_down_x4_aa(self) -> None:
         with utils.Timer('(8, 8) to (2, 2) with AA: {}'):
             x = self.imresize(
-                self.input_square, sides=(2, 2), antialiasing=True,
+                self.input_square, scale=(1 / 4), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x4_aa')
+        return
 
     def test_cuda_down_down_x4_aa(self) -> None:
         if self.test_cuda is False:
@@ -223,18 +387,20 @@ class TestBicubic(unittest.TestCase):
 
         with utils.Timer('(8, 8) to (2, 2) with AA using CUDA: {}'):
             x = self.imresize(
-                self.input_square_cuda, sides=(2, 2), antialiasing=True,
+                self.input_square_cuda, scale=(1 / 4), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x4_aa')
+        return
 
     def test_down_down_x5_aa(self) -> None:
         with utils.Timer('(15, 15) to (3, 3) with AA: {}'):
             x = self.imresize(
-                self.input_15x15, sides=(3, 3), antialiasing=True,
+                self.input_15x15, scale=(1 / 5), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x5_aa')
+        return
 
     def test_cuda_down_down_x5_aa(self) -> None:
         if self.test_cuda is False:
@@ -242,10 +408,11 @@ class TestBicubic(unittest.TestCase):
 
         with utils.Timer('(15, 15) to (3, 3) with AA using CUDA: {}'):
             x = self.imresize(
-                self.input_15x15_cuda, sides=(3, 3), antialiasing=True,
+                self.input_15x15_cuda, scale=(1 / 5), antialiasing=True,
             )
 
         self.check_diff(x, 'down_down_x5_aa')
+        return
 
     def test_up_up_topleft_noaa(self) -> None:
         with utils.Timer('(4, 4) topleft to (5, 5) without AA: {}'):
@@ -254,6 +421,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_topleft_noaa')
+        return
 
     def test_cuda_up_up_topleft_noaa(self) -> None:
         if self.test_cuda is False:
@@ -265,6 +433,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_topleft_noaa')
+        return
 
     def test_up_up_bottomright_noaa(self) -> None:
         with utils.Timer('(4, 4) bottomright to (5, 5) without AA: {}'):
@@ -273,6 +442,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_bottomright_noaa')
+        return
 
     def test_cuda_up_up_bottomright_noaa(self) -> None:
         if self.test_cuda is False:
@@ -284,6 +454,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_bottomright_noaa')
+        return
 
     def test_up_up_irregular_noaa(self) -> None:
         with utils.Timer('(8, 8) to (11, 13) without AA: {}'):
@@ -292,6 +463,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_irregular_noaa')
+        return
 
     def test_cuda_up_up_irregular_noaa(self) -> None:
         if self.test_cuda is False:
@@ -303,6 +475,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_irregular_noaa')
+        return
 
     def test_up_up_irregular_aa(self) -> None:
         with utils.Timer('(8, 8) to (11, 13) with AA: {}'):
@@ -311,6 +484,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_irregular_aa')
+        return
 
     def test_cuda_up_up_irregular_aa(self) -> None:
         if self.test_cuda is False:
@@ -322,6 +496,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_irregular_aa')
+        return
 
     def test_down_down_butterfly_irregular_noaa(self) -> None:
         with utils.Timer('(256, 256) butterfly to (123, 234) without AA: {}'):
@@ -330,6 +505,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+        return
 
     def test_cuda_down_down_butterfly_irregular_noaa(self) -> None:
         if self.test_cuda is False:
@@ -341,6 +517,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+        return
 
     def test_double_down_down_butterfly_irregular_noaa(self) -> None:
         double = self.butterfly.double()
@@ -348,6 +525,7 @@ class TestBicubic(unittest.TestCase):
             x = self.imresize(double, sides=(123, 234), antialiasing=False)
 
         self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+        return
 
     def test_double_cuda_down_down_butterfly_irregular_noaa(self) -> None:
         if self.test_cuda is False:
@@ -358,6 +536,7 @@ class TestBicubic(unittest.TestCase):
             x = self.imresize(double, sides=(123, 234), antialiasing=False)
 
         self.check_diff(x, 'down_down_butterfly_irregular_noaa')
+        return
 
     def test_down_down_butterfly_irregular_aa(self) -> None:
         with utils.Timer('(256, 256) butterfly to (123, 234) with AA: {}'):
@@ -366,6 +545,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_butterfly_irregular_aa')
+        return
 
     def test_cuda_down_down_butterfly_irregular_aa(self) -> None:
         if self.test_cuda is False:
@@ -377,6 +557,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'down_down_butterfly_irregular_aa')
+        return
 
     def test_up_up_butterfly_irregular_noaa(self) -> None:
         with utils.Timer('(256, 256) butterfly to (1234, 789) without AA: {}'):
@@ -385,6 +566,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_butterfly_irregular_noaa')
+        return
 
     def test_cuda_up_up_butterfly_irregular_noaa(self) -> None:
         if self.test_cuda is False:
@@ -396,6 +578,7 @@ class TestBicubic(unittest.TestCase):
             )
 
         self.check_diff(x, 'up_up_butterfly_irregular_noaa')
+        return
 
 
 if __name__ == '__main__':
