@@ -29,7 +29,27 @@ You do not need any additional dependencies to use this repository.
 
 ## How to use
 
-Copy `core.py` from the repository and do the following:
+We provide two options to use this package in your project.
+The first way is a Git submodule system, which helps you to keep track of important updates.
+```bash
+# In your project repository
+$ git submodule add https://github.com/thstkdgus35/bicubic_pytorch
+
+# To get an update
+$ cd bicubic_pytorch
+$ git pull origin
+```
+
+```python
+# In your python code
+import torch
+from bicubic_pytorch import core
+
+x = torch.randn(1, 3, 224, 224)
+y = core.imresize(x, scale=0.5)
+```
+
+Otherwise, copy `core.py` from the repository as follows:
 
 ```python
 import torch

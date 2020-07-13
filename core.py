@@ -1,10 +1,10 @@
 '''
 A standalone PyTorch implementation for fast and efficient bicubic resampling.
-The resulting values will be the same to MATLAB function imresize('bicubic').
+The resulting values are the same to MATLAB function imresize('bicubic').
 
 ## Author:      Sanghyun Son
 ## Email:       sonsang35@gmail.com (primary), thstkdgus35@snu.ac.kr (secondary)
-## Version:     1.0.0
+## Version:     1.1.0
 ## Last update: July 9th, 2020 (KST)
 
 Depencency: torch
