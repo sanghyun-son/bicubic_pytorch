@@ -124,8 +124,9 @@ If you have found our implementation useful, please star and cite this repositor
 @misc{son2020bicubic,
     author = {Son, Sanghyun},
     title = {bicubic-pytorch},
-    howpublished = {Open source},
     year = {2020},
-    note = {https://github.com/thstkdgus35/bicubic-pytorch},
+    publisher = {GitHub},
+    journal = {GitHub repository},
+    howpublished = {\usr{https://github.com/thstkdgus35/bicubic-pytorch}},
 }
 ```
