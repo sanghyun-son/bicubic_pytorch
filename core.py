@@ -28,8 +28,6 @@ from torch.nn import functional as F
 
 __all__ = ['imresize']
 
-K = typing.TypeVar('K', str, torch.Tensor)
-
 def cubic_contribution(x: torch.Tensor, a: float=-0.5) -> torch.Tensor:
     ax = x.abs()
     ax2 = ax * ax
@@ -201,7 +199,7 @@ def reshape_tensor(x: torch.Tensor, dim: int, kernel_size: int) -> torch.Tensor:
 def resize_1d(
         x: torch.Tensor,
         dim: int,
-        side: int=None,
+        side: typing.Optional[int]=None,
         kernel: str='cubic',
         sigma: float=2.0,
         padding_type: str='reflect',
@@ -301,9 +299,9 @@ def downsampling_2d(
 
 def imresize(
         x: torch.Tensor,
-        scale: float=None,
-        sides: typing.Tuple[int, int]=None,
-        kernel: K='cubic',
+        scale: typing.Optional[float]=None,
+        sides: typing.Optional[typing.Tuple[int, int]]=None,
+        kernel: typing.Union[str, torch.Tensor]='cubic',
         sigma: float=2,
         rotation_degree: float=0,
         padding_type: str='reflect',
