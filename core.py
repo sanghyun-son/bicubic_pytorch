@@ -26,6 +26,8 @@ import typing
 import torch
 from torch.nn import functional as F
 
+__all__ = ['imresize']
+
 K = typing.TypeVar('K', str, torch.Tensor)
 
 def cubic_contribution(x: torch.Tensor, a: float=-0.5) -> torch.Tensor:
