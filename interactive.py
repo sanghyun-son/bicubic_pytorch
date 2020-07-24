@@ -27,10 +27,10 @@ class Interactive(QMainWindow):
 
     def __init__(self, app: QApplication, img: str) -> None:
         super().__init__()
-        self.setStyleSheet('background-color: black;')
+        self.setStyleSheet('background-color: gray;')
         self.margin = 300
         img = Image.open(img)
-        w, h = img.size
+        #w, h = img.size
         #img = img.resize((2 * w, 2 * h), Image.NEAREST)
         self.img = np.array(img)
         self.img_tensor = utils.np2tensor(self.img).cuda()
@@ -51,12 +51,7 @@ class Interactive(QMainWindow):
         screen_offset_w = (screen_w - window_w) // 2
 
         self.setGeometry(screen_offset_w, screen_offset_h, window_w, window_h)
-        self.cps = {
-            'tl': (0, 0),
-            'tr': (0, self.img_w ),
-            'bl': (self.img_h, 0),
-            'br': (self.img_h, self.img_w),
-        }
+        self.reset_cps()
         self.line_order = ('tl', 'tr', 'br', 'bl')
         self.grab = None
 
@@ -64,6 +59,15 @@ class Interactive(QMainWindow):
         self.inter_idx = 2
         self.backend = 'opencv'
         self.update()
+        return
+
+    def reset_cps(self) -> None:
+        self.cps = {
+            'tl': (0, 0),
+            'tr': (0, self.img_w - 1),
+            'bl': (self.img_h - 1, 0),
+            'br': (self.img_h - 1, self.img_w - 1),
+        }
         return
 
     def keyPressEvent(self, e) -> None:
@@ -78,12 +82,13 @@ class Interactive(QMainWindow):
                 self.inter = cv2.INTER_LINEAR
             else:
                 self.inter = cv2.INTER_CUBIC
-
         elif e.key() == Qt.Key_M:
             if self.backend == 'opencv':
                 self.backend = 'core'
             elif self.backend == 'core':
                 self.backend = 'opencv'
+        elif e.key() == Qt.Key_R:
+            self.reset_cps()
 
         self.update()
         return
@@ -110,9 +115,9 @@ class Interactive(QMainWindow):
     def get_matrix(self) -> np.array:
         points_from = np.array([
             [0, 0],
-            [self.img_w, 0],
-            [0, self.img_h],
-            [self.img_w, self.img_h],
+            [self.img_w - 1, 0],
+            [0, self.img_h - 1],
+            [self.img_w - 1, self.img_h - 1],
         ]).astype(np.float32)
         points_to = np.array([
             [self.cps['tl'][1], self.cps['tl'][0]],
@@ -130,17 +135,43 @@ class Interactive(QMainWindow):
             self,
             m: np.array) -> typing.Tuple[float, float, float, float]:
 
+        '''
+
+        '''
+
+        '''
+        What is a difference between corners and corner_points?
+        corners:
+            Actual corners of a rectangular image.
+            Determine the image size.
+        corner_points:
+            The point coordinates.
+            Determine the pixel position.
+        '''
         corners = np.array([
-            [0, 0, self.img_w, self.img_w],
-            [0, self.img_h, 0, self.img_h],
+            [-0.5, -0.5, self.img_w - 0.5, self.img_w - 0.5],
+            [-0.5, self.img_h - 0.5, -0.5, self.img_h - 0.5],
             [1, 1, 1, 1],
         ])
         corners = np.matmul(m, corners)
         corners /= corners[-1, :]
-        y_min = corners[1].min()
-        x_min = corners[0].min()
-        h_new = math.floor(corners[1].max() - y_min)
-        w_new = math.floor(corners[0].max() - x_min)
+        y_min = corners[1].min() + 0.5
+        x_min = corners[0].min() + 0.5
+        h_new = math.floor(corners[1].max() - y_min + 0.5)
+        w_new = math.floor(corners[0].max() - x_min + 0.5)
+        '''
+        corner_points = np.array([
+            [0, 0, self.img_w - 1, self.img_w - 1],
+            [0, self.img_h - 1, 0, self.img_h - 1],
+            [1, 1, 1, 1],
+        ])
+        corner_points = np.matmul(m, corner_points)
+        corner_points /= corner_points[-1, :]
+        y_min = corner_points[1].min()
+        x_min = corner_points[0].min()
+        h_new = math.floor(corner_points[1].max() - y_min)
+        w_new = math.floor(corner_points[0].max() - x_min)
+        '''
         return y_min, x_min, h_new, w_new
 
     def mouseMoveEvent(self, e) -> None:
@@ -208,13 +239,7 @@ class Interactive(QMainWindow):
 
         qp = QPainter()
         qp.begin(self)
-        qp.drawPixmap(
-            self.margin + 1,
-            self.margin + 1,
-            self.img_w,
-            self.img_h,
-            qpix,
-        )
+        qp.drawPixmap(self.margin, self.margin, self.img_w, self.img_h, qpix)
 
         m = self.get_matrix()
         y_min, x_min, h_new, w_new = self.get_dimension(m)
@@ -240,15 +265,13 @@ class Interactive(QMainWindow):
         qimg_warp = QImage(warp, w_new, h_new, 3 * w_new, QImage.Format_RGB888)
         qpix_warp = QPixmap(qimg_warp)
         qp.drawPixmap(
-            self.offset_w + x_min + 1,
-            self.offset_h + y_min + 1,
+            self.offset_w + x_min,
+            self.offset_h + y_min,
             w_new,
             h_new,
             qpix_warp,
         )
 
-        pen = QPen(Qt.blue, 3)
-        qp.setPen(pen)
         '''
         for i, pos in enumerate(self.line_order):
             j = (i + 1) % 4
@@ -263,24 +286,25 @@ class Interactive(QMainWindow):
         center_y = self.offset_h + self.img_h // 2
         center_x = self.offset_w + self.img_w // 2
 
-        pen_red = QPen(Qt.red, 5)
+        pen_blue = QPen(Qt.blue, 5)
         pen_white = QPen(Qt.white, 10)
-        brush = QBrush(Qt.red, Qt.SolidPattern)
-        qp.setBrush(brush)
+        text_size = 20
+        #brush = QBrush(Qt.red, Qt.SolidPattern)
+        #qp.setBrush(brush)
         for key, val in self.cps.items():
             y, x = val
-            y = y + self.offset_h - 1
-            x = x + self.offset_w - 1
-            qp.setPen(pen_red)
-            qp.drawEllipse(x, y, 5, 5)
+            y = y + self.offset_h
+            x = x + self.offset_w
+            qp.setPen(pen_blue)
+            #qp.drawEllipse(x, y, 3, 3)
+            qp.drawPoint(x, y)
             qp.setPen(pen_white)
             dy = y - center_y
             dx = x - center_x
-            dl = math.sqrt(dy ** 2 + dx ** 2) / 20
-            text_size = 20
+            dl = math.sqrt(dy ** 2 + dx ** 2) / 10
             qp.drawText(
                 x + (dx / dl) - text_size // 2,
-                y + (dy / dl) - text_size // 2 + 3,
+                y + (dy / dl) - text_size // 2,
                 text_size,
                 text_size,
                 int(Qt.AlignCenter),
@@ -293,7 +317,7 @@ class Interactive(QMainWindow):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--img', type=str, default='example/butterfly.png')
+    parser.add_argument('--img', type=str, default='example/butterfly_corners.png')
     parser.add_argument('--full', action='store_true')
     cfg = parser.parse_args()
 
