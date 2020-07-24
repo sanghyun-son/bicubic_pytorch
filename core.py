@@ -26,7 +26,10 @@ import typing
 import torch
 from torch.nn import functional as F
 
-__all__ = ['imresize']
+__all__ = ['imresize'] 
+
+_I = typing.Optional[int]
+_D = typing.Optional[torch.dtype]
 
 def cubic_contribution(x: torch.Tensor, a: float=-0.5) -> torch.Tensor:
     ax = x.abs()
@@ -124,9 +127,11 @@ def padding(
         dim: int,
         pad_pre: int,
         pad_post: int,
-        padding_type: str='reflect') -> torch.Tensor:
+        padding_type: typing.Optional[str]='reflect') -> torch.Tensor:
 
-    if padding_type == 'reflect':
+    if padding_type is None:
+        return x
+    elif padding_type == 'reflect':
         x_pad = reflect_padding(x, dim, pad_pre, pad_post)
     else:
         raise ValueError('{} padding is not supported!'.format(padding_type))
@@ -195,6 +200,62 @@ def reshape_tensor(x: torch.Tensor, dim: int, kernel_size: int) -> torch.Tensor:
     unfold = F.unfold(x, k)
     unfold = unfold.view(unfold.size(0), -1, h_out, w_out)
     return unfold
+
+def reshape_input(
+        x: torch.Tensor) -> typing.Tuple[torch.Tensor, _I, _I, _I, _I]:
+
+    if x.dim() == 4:
+        b, c, h, w = x.size()
+    elif x.dim() == 3:
+        c, h, w = x.size()
+        b = None
+    elif x.dim() == 2:
+        h, w = x.size()
+        b = c = None
+    else:
+        raise ValueError('{}-dim Tensor is not supported!'.format(x.dim()))
+
+    x = x.view(-1, 1, h, w)
+    return x, b, c, h, w
+
+def reshape_output(
+        x: torch.Tensor, b: _I, c: _I) -> torch.Tensor:
+
+    rh = x.size(-2)
+    rw = x.size(-1)
+    # Back to the original dimension
+    if b is not None:
+        x = x.view(b, c, rh, rw)        # 4-dim
+    else:
+        if c is not None:
+            x = x.view(c, rh, rw)       # 3-dim
+        else:
+            x = x.view(rh, rw)          # 2-dim
+
+    return x
+
+def cast_input(x: torch.Tensor) -> typing.Tuple[torch.Tensor, _D]:
+
+    if x.dtype != torch.float32 or x.dtype != torch.float64:
+        dtype = x.dtype
+        x = x.float()
+    else:
+        dtype = None
+
+    return x, dtype
+
+def cast_output(x: torch.Tensor, dtype: _D) -> torch.Tensor:
+
+    if dtype is not None:
+        if not dtype.is_floating_point:
+            x = x.round()
+        # To prevent over/underflow when converting types
+        if dtype is torch.uint8:
+            x = x.clamp(0, 255)
+
+        x = x.to(dtype=dtype)
+
+    return x
 
 def resize_1d(
         x: torch.Tensor,
@@ -327,18 +388,7 @@ def imresize(
     if scale is not None and sides is not None:
         raise ValueError('Please specify scale or sides to avoid conflict!')
 
-    if x.dim() == 4:
-        b, c, h, w = x.size()
-    elif x.dim() == 3:
-        c, h, w = x.size()
-        b = None
-    elif x.dim() == 2:
-        h, w = x.size()
-        b = c = None
-    else:
-        raise ValueError('{}-dim Tensor is not supported!'.format(x.dim()))
-
-    x = x.view(-1, 1, h, w)
+    x, b, c, h, w = reshape_input(x)
 
     if sides is None:
         # Determine output size
@@ -352,11 +402,7 @@ def imresize(
                 'should be used with a predefined kernel!'
             )
 
-    if x.dtype != torch.float32 or x.dtype != torch.float64:
-        dtype = x.dtype
-        x = x.float()
-    else:
-        dtype = None
+    x, dtype = cast_input(x)
 
     if isinstance(kernel, str):
         # Shared keyword arguments across dimensions
@@ -372,26 +418,8 @@ def imresize(
     elif isinstance(kernel, torch.Tensor):
         x = downsampling_2d(x, kernel, scale=int(1 / scale))
 
-    rh = x.size(-2)
-    rw = x.size(-1)
-    # Back to the original dimension
-    if b is not None:
-        x = x.view(b, c, rh, rw)        # 4-dim
-    else:
-        if c is not None:
-            x = x.view(c, rh, rw)       # 3-dim
-        else:
-            x = x.view(rh, rw)          # 2-dim
-
-    if dtype is not None:
-        if not dtype.is_floating_point:
-            x = x.round()
-        # To prevent over/underflow when converting types
-        if dtype is torch.uint8:
-            x = x.clamp(0, 255)
-
-        x = x.to(dtype=dtype)
-
+    x = reshape_output(x, b, c)
+    x = cast_output(x, dtype)
     return x
 
 if __name__ == '__main__':

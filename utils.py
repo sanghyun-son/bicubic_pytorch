@@ -27,17 +27,18 @@ class Timer(object):
         return
 
 
-def get_img(img_path: str) -> torch.Tensor:
-    img = imageio.imread(img_path)
-    img = np.transpose(img, (2, 0, 1))
-    img = torch.from_numpy(img)
-    while img.dim() < 4:
-        img.unsqueeze_(0)
+def np2tensor(x: np.array) -> torch.Tensor:
+    x = np.transpose(x, (2, 0, 1))
+    x = torch.from_numpy(x)
+    with torch.no_grad():
+        while x.dim() < 4:
+            x.unsqueeze_(0)
 
-    img = img.float() / 255
-    return img
+        x = x.float() / 255
 
-def save_img(x: torch.Tensor, img_path: str) -> None:
+    return x
+
+def tensor2np(x: torch.Tensor) -> np.array:
     with torch.no_grad():
         x = 255 * x
         x = x.round().clamp(min=0, max=255).byte()
@@ -45,5 +46,15 @@ def save_img(x: torch.Tensor, img_path: str) -> None:
 
     x = x.cpu().numpy()
     x = np.transpose(x, (1, 2, 0))
+    x = np.ascontiguousarray(x)
+    return x
+
+def get_img(img_path: str) -> torch.Tensor:
+    x = imageio.imread(img_path)
+    x = np2tensor(x)
+    return x
+
+def save_img(x: torch.Tensor, img_path: str) -> None:
+    x = tensor2np(x)
     imageio.imwrite(img_path, x)
     return
