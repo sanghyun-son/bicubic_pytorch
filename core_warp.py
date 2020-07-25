@@ -8,6 +8,28 @@ import cv2
 import torch
 from torch.nn import functional as F
 
+def contribution_2d(x: torch.Tensor, kernel: str='cubic') -> torch.Tensor:
+    '''
+    Args:
+        x (torch.Tensor): (2, k, N), where x[0] is the x-coordinate.
+        kernel (str):
+
+    Return
+        torch.Tensor: (k^2, N)
+    '''
+    if kernel == 'nearest':
+        pass
+    elif kernel == 'bilinear':
+        weight = core.linear_contribution(x)
+    elif kernel == 'bicubic':
+        weight = core.cubic_contribution(x)
+
+    weight_x = weight[0].unsqueeze(0)
+    weight_y = weight[1].unsqueeze(1)
+    weight = weight_x * weight_y
+    weight = weight.view(-1, weight.size(-1))
+    weight = weight / weight.sum(0, keepdim=True)
+    return weight
 
 def warp_by_size(
         x: torch.Tensor,
@@ -20,50 +42,66 @@ def warp_by_size(
     h_orig = x.size(-2)
     w_orig = x.size(-1)
     h, w = sizes
-    dkwargs = {'dtype': x.dtype, 'device': x.device}
-    # Construct the target coordinate
-    pos_i = torch.linspace(start=0, end=(h - 1), steps=h, **dkwargs)
-    pos_j = torch.linspace(start=0, end=(w - 1), steps=w, **dkwargs)
-    ones = x.new_ones(h * w)
-    with torch.no_grad():
-        pos_i = pos_i.view(-1, 1)
-        pos_i = pos_i.repeat(1, w)
-        pos_j = pos_j.view(1, -1)
-        pos_j = pos_j.repeat(h, 1)
-        pos = torch.stack([pos_j.view(-1), pos_i.view(-1), ones], dim=0)
-        m_inv = m.inverse()
-        # Map to the source coordinate
-        pos_backward = torch.matmul(m_inv, pos)
-        pos_backward = pos_backward[:2] / pos_backward[-1, :]
-        # Out of the image
-        pos_under = (pos_backward < -0.5).any(dim=0)
-        pos_over_h = (pos_backward[1] >= h_orig - 0.5)
-        pos_over_w = (pos_backward[0] >= w_orig - 0.5)
-        pos_out = (pos_under + pos_over_h + pos_over_w).float()
+    dkwargs = {'dtype': x.dtype, 'device': x.device, 'requires_grad': False}
+    # Construct the target coordinates
+    # The target coordinates do not require gradients
+    pos_i = torch.arange(h, **dkwargs)
+    pos_j = torch.arange(w, **dkwargs)
+    pos_i = pos_i.view(-1, 1).repeat(1, w).view(-1)
+    pos_j = pos_j.view(1, -1).repeat(h, 1).view(-1)
+    # Map the target coordinates to the source coordinates
+    # This implements the backward warping
+    pos = torch.stack([pos_j, pos_i, torch.ones_like(pos_i)], dim=0)
+    pos_bw = torch.matmul(m.inverse(), pos)
+    pos_bw = pos_bw[:2] / pos_bw[-1, :]
+    # Out of the image
+    pos_over = pos_bw.new_tensor([w_orig, h_orig]).unsqueeze(-1)
+    pos_out = torch.logical_or(pos_bw.lt(-0.5), pos_bw.ge(pos_over - 0.5))
+    pos_out = pos_out.any(0).float()
 
-        if isinstance(kernel, str):
-            if kernel == 'nearest':
-                kernel_size = 1
-                pos_backward = pos_backward.round()
-                idx = pos_backward[0] + x.size(-1) * pos_backward[1]
-            elif kernel == 'bilinear':
+    if isinstance(kernel, str):
+        if kernel == 'nearest':
+            kernel_size = 1
+            pad = 0
+            pos_discrete = pos_bw.round()
+        else:
+            if kernel == 'bilinear':
                 kernel_size = 2
             elif kernel == 'cubic':
                 kernel_size = 4
-        else:
-            pass
 
-        idx = -1 * pos_out + (1 - pos_out) * idx
-        idx = idx.long()
-        idx = idx.clamp(min=-1)
+            pad = kernel_size // 2
+            pos_discrete = pos_bw.ceil()
+            # (2, 1, HW)
+            pos_frac = pos_bw - pos_bw.floor()
+            pos_frac.unsqueeze_(1)
+            # (2, k, 1)
+            pos_w = torch.linspace(-pad + 1, pad, kernel_size, **dkwargs)
+            pos_w = pos_frac - pos_w.view(1, -1, 1).repeat(2, 1, 1)
+            # (1, k^2, HW)
+            weight = contribution_2d(pos_w, kernel=kernel)
+            weight.unsqueeze_(0)
+    else:
+        pass
+
+    # Calculate the exact sampling point
+    idx = pos_discrete[0] + (x.size(-1) + pad) * pos_discrete[1]
+    # Remove the outside region
+    idx = -1 * pos_out + (1 - pos_out) * idx
+    idx = idx.long()
+    idx = idx.clamp(min=-1)
+
+    x = core.padding(x, -2, pad, pad, padding_type=padding_type)
+    x = core.padding(x, -1, pad, pad, padding_type=padding_type)
 
     x = F.unfold(x, (kernel_size, kernel_size))
+
     fill_value = x.new_full((x.size(0), x.size(1), 1), fill_value=fill_value)
     x = torch.cat((x, fill_value), dim=-1)
-    # (B, kernel_size^2, H x W)
-    if kernel == 'nearest':
-        x = x[..., idx]
-
+    # (B, k^2, HW)
+    x = x[..., idx]
+    x = x * weight
+    x = x.sum(dim=1, keepdim=True)
     x = x.view(-1, 1, h, w)
     return x
 
@@ -118,11 +156,12 @@ if __name__ == '__main__':
     import os
     import utils
     #x = torch.arange(64).float().view(1, 1, 8, 8)
+    #x = torch.arange(16).float().view(1, 1, 4, 4)
     x = utils.get_img('example/butterfly.png')
     #m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
-    m = torch.Tensor([[2.33e-01, 3.97e-3, 3], [-4.49e-1, 2.49e-1, 1.15e2], [-2.95e-3, 1.55e-5, 1]])
-    #m = torch.Tensor([[2, 0, 1], [0, 2, 0], [0, 0, 1]])
-    y = warp(x, m, sizes='auto', kernel='nearest', fill_value=0)
+    #m = torch.Tensor([[2.33e-01, 3.97e-3, 3], [-4.49e-1, 2.49e-1, 1.15e2], [-2.95e-3, 1.55e-5, 1]])
+    m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
+    y = warp(x, m, sizes='auto', kernel='bilinear', fill_value=0)
     #y = warp(x, m, kernel='nearest', fill_value=0)
     os.makedirs('dummy', exist_ok=True)
     utils.save_img(y, 'dummy/warp.png')

@@ -258,7 +258,7 @@ class Interactive(QMainWindow):
                 self.img_tensor,
                 torch.Tensor(m),
                 sizes=(h_new, w_new),
-                kernel='nearest',
+                kernel='bilinear',
             )
             warp = utils.tensor2np(warp)
 

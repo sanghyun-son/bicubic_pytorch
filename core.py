@@ -31,13 +31,19 @@ __all__ = ['imresize']
 _I = typing.Optional[int]
 _D = typing.Optional[torch.dtype]
 
+def linear_contribution(x: torch.Tensor) -> torch.Tensor:
+    ax = x.abs()
+    range_01 = ax.le(1)
+    cont = (1 - ax) * range_01.to(dtype=x.dtype)
+    return cont
+
 def cubic_contribution(x: torch.Tensor, a: float=-0.5) -> torch.Tensor:
     ax = x.abs()
     ax2 = ax * ax
     ax3 = ax * ax2
 
-    range_01 = (ax <= 1)
-    range_12 = (ax > 1) * (ax <= 2)
+    range_01 = ax.le(1)
+    range_12 = torch.logical_and(ax.gt(1), ax.le(2))
 
     cont_01 = (a + 2) * ax3 - (a + 3) * ax2 + 1
     cont_01 = cont_01 * range_01.to(dtype=x.dtype)
@@ -46,7 +52,6 @@ def cubic_contribution(x: torch.Tensor, a: float=-0.5) -> torch.Tensor:
     cont_12 = cont_12 * range_12.to(dtype=x.dtype)
 
     cont = cont_01 + cont_12
-    cont = cont / cont.sum()
     return cont
 
 def gaussian_contribution(x: torch.Tensor, sigma: float=2.0) -> torch.Tensor:
@@ -330,9 +335,9 @@ def resize_1d(
         weight = weight.view(1, kernel_size, 1, sample.size(3))
 
     # Apply the kernel
-    down = sample * weight
-    down = down.sum(dim=1, keepdim=True)
-    return down
+    x = sample * weight
+    x = x.sum(dim=1, keepdim=True)
+    return x
 
 def downsampling_2d(
         x: torch.Tensor,
