@@ -35,17 +35,23 @@ def warp_by_size(
         x: torch.Tensor,
         m: torch.Tensor,
         sizes: typing.Tuple[int, int],
-        kernel: typing.Union[str, torch.Tensor]='bicubic',
+        kernel: str='bicubic',
         padding_type: str='reflect',
         fill_value: int=0) -> torch.Tensor:
 
-    h, w = sizes
+    kernels = {'nearest': 1, 'bilinear': 2, 'bicubic': 4}
+    if kernel in kernels:
+        k = kernels[kernel]
+        pad = k // 2
+    else:
+        raise ValueError('kernel: {} is not supported!'.format(kernel))
+
     dkwargs = {'device': x.device, 'requires_grad': False}
     # Construct the target coordinates
     # The target coordinates do not require gradients
-    pos = torch.arange(h * w, **dkwargs)
-    pos_i = (pos // w).float()
-    pos_j = (pos % w).float()
+    pos = torch.arange(sizes[0] * sizes[1], **dkwargs)
+    pos_i = (pos // sizes[1]).float()
+    pos_j = (pos % sizes[1]).float()
     # Map the target coordinates to the source coordinates
     # This implements the backward warping
     pos_tar = torch.stack([pos_j, pos_i, torch.ones_like(pos_i)], dim=0)
@@ -56,59 +62,41 @@ def warp_by_size(
     pos_bound.unsqueeze_(-1)
     pos_in = torch.logical_and(pos_src.ge(-0.5), pos_src.lt(pos_bound))
     pos_in = pos_in.all(0)
-    # Remove the outside region
+    # Remove the outside region and compensate subpixel shift
+    sub = (k % 2) / 2
     pos_src = pos_src[..., pos_in]
-
-    kernels = {'nearest': 1, 'bilinear': 2, 'bicubic': 4}
-    if isinstance(kernel, str):
-        if kernel in kernels:
-            kernel_size = kernels[kernel]
-        else:
-            raise ValueError('kernel: {} is not supported!'.format(kernel))
-
-        if kernel_size % 2 == 0:
-            pos_discrete = pos_src.ceil().long()
-            pos_frac = pos_src - pos_src.floor()
-        else:
-            pos_discrete = pos_src.round().long()
-            pos_frac = torch.ones_like(pos_src)
-
-        pad = kernel_size // 2
-        # (2, 1, HW)
-        pos_frac.unsqueeze_(1)
-        # (2, k, 1)
-        pos_w = torch.linspace(-pad + 1, pad, kernel_size, **dkwargs)
-        pos_w = pos_frac - pos_w.view(1, -1, 1).repeat(2, 1, 1)
-        # (1, k^2, HW)
-        weight = contribution_2d(pos_w, kernel=kernel)
-        weight.unsqueeze_(0)
-    else:
-        pass
+    pos_src_sub = pos_src - sub
+    pos_discrete = pos_src_sub.ceil().long()
+    pos_frac = pos_src_sub - pos_src.floor()
+    pos_frac.unsqueeze_(1)
+    # (2, 1, HW)
+    pos_w = torch.linspace(pad - k + 1, pad, k, **dkwargs)
+    pos_w = pos_w.view(1, -1, 1).repeat(2, 1, 1)
+    pos_w = pos_frac - pos_w
+    weight = contribution_2d(pos_w, kernel=kernel)
+    weight.unsqueeze_(0)
 
     # Calculate the exact sampling point
-    if kernel == 'nearest':
-        idx = pos_discrete[0] + x.size(-1) * pos_discrete[1]
-    else:
-        idx = pos_discrete[0] + (x.size(-1) + 1) * pos_discrete[1]
+    idx = pos_discrete[0] + (x.size(-1) + 1 - k % 2) * pos_discrete[1]
 
     # (B, k^2, HW)
     x = core.padding(x, -2, pad, pad, padding_type=padding_type)
     x = core.padding(x, -1, pad, pad, padding_type=padding_type)
-    x = F.unfold(x, (kernel_size, kernel_size))
-
+    x = F.unfold(x, (k, k))
     sample = x[..., idx]
+
     y = sample * weight
     y = y.sum(dim=1)
     out = y.new_full((y.size(0), pos_in.size(0)), fill_value)
     out.masked_scatter_(pos_in, y)
-    out = out.view(-1, 1, h, w)
+    out = out.view(-1, 1, *sizes)
     return out
 
 def warp(
         x: torch.Tensor,
         m: torch.Tensor,
         sizes: typing.Union[typing.Tuple[int, int], str, None]=None,
-        kernel: typing.Union[str, torch.Tensor]='bicubic',
+        kernel: str='bicubic',
         padding_type: str='reflect',
         fill_value: int=0) -> torch.Tensor:
 
