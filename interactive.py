@@ -244,6 +244,7 @@ class Interactive(QMainWindow):
                 torch.Tensor(m),
                 sizes=(h_new, w_new),
                 kernel=inter_method.lower(),
+                fill_value=0.5
             )
             warp = utils.tensor2np(warp)
 

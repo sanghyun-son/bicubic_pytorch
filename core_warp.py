@@ -39,25 +39,25 @@ def warp_by_size(
         padding_type: str='reflect',
         fill_value: int=0) -> torch.Tensor:
 
-    h_orig = x.size(-2)
-    w_orig = x.size(-1)
     h, w = sizes
-    dkwargs = {'dtype': x.dtype, 'device': x.device, 'requires_grad': False}
+    dkwargs = {'device': x.device, 'requires_grad': False}
     # Construct the target coordinates
     # The target coordinates do not require gradients
-    pos_i = torch.arange(h, **dkwargs)
-    pos_j = torch.arange(w, **dkwargs)
-    pos_i = pos_i.view(-1, 1).repeat(1, w).view(-1)
-    pos_j = pos_j.view(1, -1).repeat(h, 1).view(-1)
+    pos = torch.arange(h * w, **dkwargs)
+    pos_i = (pos // w).float()
+    pos_j = (pos % w).float()
     # Map the target coordinates to the source coordinates
     # This implements the backward warping
-    pos = torch.stack([pos_j, pos_i, torch.ones_like(pos_i)], dim=0)
-    pos_bw = torch.matmul(m.inverse(), pos)
-    pos_bw = pos_bw[:2] / pos_bw[-1, :]
+    pos_tar = torch.stack([pos_j, pos_i, torch.ones_like(pos_i)], dim=0)
+    pos_src = torch.matmul(m.inverse(), pos_tar)
+    pos_src = pos_src[:2] / pos_src[-1, :]
     # Out of the image
-    pos_over = pos_bw.new_tensor([w_orig, h_orig]).unsqueeze(-1)
-    pos_out = torch.logical_or(pos_bw.lt(-0.5), pos_bw.ge(pos_over - 0.5))
-    pos_out = pos_out.any(0).float()
+    pos_bound = pos_src.new_tensor([x.size(-1), x.size(-2)]) - 0.5
+    pos_bound.unsqueeze_(-1)
+    pos_in = torch.logical_and(pos_src.ge(-0.5), pos_src.lt(pos_bound))
+    pos_in = pos_in.all(0)
+    # Remove the outside region
+    pos_src = pos_src[..., pos_in]
 
     kernels = {'nearest': 1, 'bilinear': 2, 'bicubic': 4}
     if isinstance(kernel, str):
@@ -67,11 +67,11 @@ def warp_by_size(
             raise ValueError('kernel: {} is not supported!'.format(kernel))
 
         if kernel_size % 2 == 0:
-            pos_discrete = pos_bw.ceil()
-            pos_frac = pos_bw - pos_bw.floor()
+            pos_discrete = pos_src.ceil().long()
+            pos_frac = pos_src - pos_src.floor()
         else:
-            pos_discrete = pos_bw.round()
-            pos_frac = torch.ones_like(pos_discrete)
+            pos_discrete = pos_src.round().long()
+            pos_frac = torch.ones_like(pos_src)
 
         pad = kernel_size // 2
         # (2, 1, HW)
@@ -91,26 +91,18 @@ def warp_by_size(
     else:
         idx = pos_discrete[0] + (x.size(-1) + 1) * pos_discrete[1]
 
-    # Remove the outside region
-    idx = -1 * pos_out + (1 - pos_out) * idx
-    idx = idx.long()
-    idx = idx.clamp(min=-1)
-
+    # (B, k^2, HW)
     x = core.padding(x, -2, pad, pad, padding_type=padding_type)
     x = core.padding(x, -1, pad, pad, padding_type=padding_type)
     x = F.unfold(x, (kernel_size, kernel_size))
-    '''
-    for i in range(x.size(-1)):
-        print(x[..., i].view(4, 4), weight[..., i].view(4, 4))
-    '''
-    fill_value = x.new_full((x.size(0), x.size(1), 1), fill_value=fill_value)
-    x = torch.cat((x, fill_value), dim=-1)
-    # (B, k^2, HW)
-    x = x[..., idx]
-    x = x * weight
-    x = x.sum(dim=1, keepdim=True)
-    x = x.view(-1, 1, h, w)
-    return x
+
+    sample = x[..., idx]
+    y = sample * weight
+    y = y.sum(dim=1)
+    out = y.new_full((y.size(0), pos_in.size(0)), fill_value)
+    out.masked_scatter_(pos_in, y)
+    out = out.view(-1, 1, h, w)
+    return out
 
 def warp(
         x: torch.Tensor,
@@ -165,11 +157,10 @@ if __name__ == '__main__':
     #x = torch.arange(64).float().view(1, 1, 8, 8)
     #x = torch.arange(16).float().view(1, 1, 4, 4)
     x = utils.get_img('example/butterfly.png')
+    x.requires_grad = True
     m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
     #m = torch.Tensor([[2.33e-01, 3.97e-3, 3], [-4.49e-1, 2.49e-1, 1.15e2], [-2.95e-3, 1.55e-5, 1]])
-    m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
-    y = warp(x, m, sizes='auto', kernel='bicubic', fill_value=0)
-    #y = warp(x, m, kernel='nearest', fill_value=0)
+    #m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
+    y = warp(x, m, sizes='auto', kernel='bicubic', fill_value=-1)
     os.makedirs('dummy', exist_ok=True)
-    #utils.save_img(y, 'dummy/warp.png')
-
+    utils.save_img(y, 'dummy/warp.png')
