@@ -18,7 +18,7 @@ def contribution_2d(x: torch.Tensor, kernel: str='cubic') -> torch.Tensor:
         torch.Tensor: (k^2, N)
     '''
     if kernel == 'nearest':
-        pass
+        weight = core.nearest_contribution(x)
     elif kernel == 'bilinear':
         weight = core.linear_contribution(x)
     elif kernel == 'bicubic':
@@ -35,7 +35,7 @@ def warp_by_size(
         x: torch.Tensor,
         m: torch.Tensor,
         sizes: typing.Tuple[int, int],
-        kernel: typing.Union[str, torch.Tensor]='cubic',
+        kernel: typing.Union[str, torch.Tensor]='bicubic',
         padding_type: str='reflect',
         fill_value: int=0) -> torch.Tensor:
 
@@ -62,30 +62,35 @@ def warp_by_size(
     if isinstance(kernel, str):
         if kernel == 'nearest':
             kernel_size = 1
-            pad = 0
             pos_discrete = pos_bw.round()
+            pos_frac = torch.ones_like(pos_discrete)
         else:
             if kernel == 'bilinear':
                 kernel_size = 2
-            elif kernel == 'cubic':
+            elif kernel == 'bicubic':
                 kernel_size = 4
 
-            pad = kernel_size // 2
             pos_discrete = pos_bw.ceil()
-            # (2, 1, HW)
             pos_frac = pos_bw - pos_bw.floor()
-            pos_frac.unsqueeze_(1)
-            # (2, k, 1)
-            pos_w = torch.linspace(-pad + 1, pad, kernel_size, **dkwargs)
-            pos_w = pos_frac - pos_w.view(1, -1, 1).repeat(2, 1, 1)
-            # (1, k^2, HW)
-            weight = contribution_2d(pos_w, kernel=kernel)
-            weight.unsqueeze_(0)
+
+        pad = kernel_size // 2
+        # (2, 1, HW)
+        pos_frac.unsqueeze_(1)
+        # (2, k, 1)
+        pos_w = torch.linspace(-pad + 1, pad, kernel_size, **dkwargs)
+        pos_w = pos_frac - pos_w.view(1, -1, 1).repeat(2, 1, 1)
+        # (1, k^2, HW)
+        weight = contribution_2d(pos_w, kernel=kernel)
+        weight.unsqueeze_(0)
     else:
         pass
 
     # Calculate the exact sampling point
-    idx = pos_discrete[0] + (x.size(-1) + pad) * pos_discrete[1]
+    if kernel == 'nearest':
+        idx = pos_discrete[0] + x.size(-1) * pos_discrete[1]
+    else:
+        idx = pos_discrete[0] + (x.size(-1) + 1) * pos_discrete[1]
+
     # Remove the outside region
     idx = -1 * pos_out + (1 - pos_out) * idx
     idx = idx.long()
@@ -93,9 +98,11 @@ def warp_by_size(
 
     x = core.padding(x, -2, pad, pad, padding_type=padding_type)
     x = core.padding(x, -1, pad, pad, padding_type=padding_type)
-
     x = F.unfold(x, (kernel_size, kernel_size))
-
+    '''
+    for i in range(x.size(-1)):
+        print(x[..., i].view(4, 4), weight[..., i].view(4, 4))
+    '''
     fill_value = x.new_full((x.size(0), x.size(1), 1), fill_value=fill_value)
     x = torch.cat((x, fill_value), dim=-1)
     # (B, k^2, HW)
@@ -109,7 +116,7 @@ def warp(
         x: torch.Tensor,
         m: torch.Tensor,
         sizes: typing.Union[typing.Tuple[int, int], str, None]=None,
-        kernel: typing.Union[str, torch.Tensor]='cubic',
+        kernel: typing.Union[str, torch.Tensor]='bicubic',
         padding_type: str='reflect',
         fill_value: int=0) -> torch.Tensor:
 
@@ -156,12 +163,12 @@ if __name__ == '__main__':
     import os
     import utils
     #x = torch.arange(64).float().view(1, 1, 8, 8)
-    #x = torch.arange(16).float().view(1, 1, 4, 4)
-    x = utils.get_img('example/butterfly.png')
+    x = torch.arange(16).float().view(1, 1, 4, 4)
+    #x = utils.get_img('example/butterfly.png')
     #m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
     #m = torch.Tensor([[2.33e-01, 3.97e-3, 3], [-4.49e-1, 2.49e-1, 1.15e2], [-2.95e-3, 1.55e-5, 1]])
     m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
-    y = warp(x, m, sizes='auto', kernel='bilinear', fill_value=0)
+    y = warp(x, m, sizes='auto', kernel='bicubic', fill_value=0)
     #y = warp(x, m, kernel='nearest', fill_value=0)
     os.makedirs('dummy', exist_ok=True)
     utils.save_img(y, 'dummy/warp.png')

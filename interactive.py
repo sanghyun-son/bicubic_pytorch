@@ -126,9 +126,6 @@ class Interactive(QMainWindow):
             [self.cps['br'][1], self.cps['br'][0]],
         ]).astype(np.float32)
         m = cv2.getPerspectiveTransform(points_from, points_to)
-        #print(points_from, points_from.shape)
-        #print(points_to, points_to.shape)
-        #print(m, m.shape)
         return m
 
     def get_dimension(
@@ -195,15 +192,7 @@ class Interactive(QMainWindow):
                 if cross_new < 6000:
                     is_convex = False
                     break
-                '''
-                else:
-                    if cross is None:
-                        cross = cross_new
-                    else:
-                        if cross * cross_new < 0:
-                            is_convex = False
-                            break
-                '''
+
             if not is_convex:
                 self.cps[self.grab] = (y_old, x_old)
 
@@ -243,11 +232,7 @@ class Interactive(QMainWindow):
 
         m = self.get_matrix()
         y_min, x_min, h_new, w_new = self.get_dimension(m)
-        mc = np.array([
-            [1, 0, -x_min],
-            [0, 1, -y_min],
-            [0, 0, 1],
-        ])
+        mc = np.array([[1, 0, -x_min], [0, 1, -y_min], [0, 0, 1]])
         m = np.matmul(mc, m)
         if self.backend == 'opencv':
             warp = cv2.warpPerspective(
@@ -258,7 +243,7 @@ class Interactive(QMainWindow):
                 self.img_tensor,
                 torch.Tensor(m),
                 sizes=(h_new, w_new),
-                kernel='bilinear',
+                kernel=inter_method.lower(),
             )
             warp = utils.tensor2np(warp)
 
@@ -271,7 +256,6 @@ class Interactive(QMainWindow):
             h_new,
             qpix_warp,
         )
-
         '''
         for i, pos in enumerate(self.line_order):
             j = (i + 1) % 4

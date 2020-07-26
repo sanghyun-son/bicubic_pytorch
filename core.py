@@ -31,6 +31,11 @@ __all__ = ['imresize']
 _I = typing.Optional[int]
 _D = typing.Optional[torch.dtype]
 
+def nearest_contribution(x: torch.Tensor) -> torch.Tensor:
+    range_around_0 = torch.logical_and(x.gt(-0.5), x.le(0.5))
+    cont = range_around_0.to(dtype=x.dtype)
+    return cont
+
 def linear_contribution(x: torch.Tensor) -> torch.Tensor:
     ax = x.abs()
     range_01 = ax.le(1)
