@@ -59,19 +59,19 @@ def warp_by_size(
     pos_out = torch.logical_or(pos_bw.lt(-0.5), pos_bw.ge(pos_over - 0.5))
     pos_out = pos_out.any(0).float()
 
+    kernels = {'nearest': 1, 'bilinear': 2, 'bicubic': 4}
     if isinstance(kernel, str):
-        if kernel == 'nearest':
-            kernel_size = 1
-            pos_discrete = pos_bw.round()
-            pos_frac = torch.ones_like(pos_discrete)
+        if kernel in kernels:
+            kernel_size = kernels[kernel]
         else:
-            if kernel == 'bilinear':
-                kernel_size = 2
-            elif kernel == 'bicubic':
-                kernel_size = 4
+            raise ValueError('kernel: {} is not supported!'.format(kernel))
 
+        if kernel_size % 2 == 0:
             pos_discrete = pos_bw.ceil()
             pos_frac = pos_bw - pos_bw.floor()
+        else:
+            pos_discrete = pos_bw.round()
+            pos_frac = torch.ones_like(pos_discrete)
 
         pad = kernel_size // 2
         # (2, 1, HW)
@@ -163,13 +163,13 @@ if __name__ == '__main__':
     import os
     import utils
     #x = torch.arange(64).float().view(1, 1, 8, 8)
-    x = torch.arange(16).float().view(1, 1, 4, 4)
-    #x = utils.get_img('example/butterfly.png')
-    #m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
+    #x = torch.arange(16).float().view(1, 1, 4, 4)
+    x = utils.get_img('example/butterfly.png')
+    m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
     #m = torch.Tensor([[2.33e-01, 3.97e-3, 3], [-4.49e-1, 2.49e-1, 1.15e2], [-2.95e-3, 1.55e-5, 1]])
     m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
     y = warp(x, m, sizes='auto', kernel='bicubic', fill_value=0)
     #y = warp(x, m, kernel='nearest', fill_value=0)
     os.makedirs('dummy', exist_ok=True)
-    utils.save_img(y, 'dummy/warp.png')
+    #utils.save_img(y, 'dummy/warp.png')
 
