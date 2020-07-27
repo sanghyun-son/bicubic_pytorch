@@ -142,13 +142,17 @@ def warp(
 if __name__ == '__main__':
     import os
     import utils
+    torch.set_printoptions(precision=4, sci_mode=False, edgeitems=16, linewidth=200)
     #x = torch.arange(64).float().view(1, 1, 8, 8)
-    #x = torch.arange(16).float().view(1, 1, 4, 4)
-    x = utils.get_img('example/butterfly.png')
-    x.requires_grad = True
-    m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
+    x = torch.arange(16).float().view(1, 1, 4, 4)
+    #x = utils.get_img('example/butterfly.png')
+    #x.requires_grad = True
+    #m = torch.Tensor([[3.2, 0.016, -68], [1.23, 1.7, -54], [0.008, 0.0001, 1]])
     #m = torch.Tensor([[2.33e-01, 3.97e-3, 3], [-4.49e-1, 2.49e-1, 1.15e2], [-2.95e-3, 1.55e-5, 1]])
-    #m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
+    m = torch.Tensor([[2, 0, 0], [0, 2, 0], [0, 0, 1]])
     y = warp(x, m, sizes='auto', kernel='bicubic', fill_value=-1)
-    os.makedirs('dummy', exist_ok=True)
-    utils.save_img(y, 'dummy/warp.png')
+    z = core.imresize(x, scale=2, kernel='cubic')
+    print(y)
+    print(z)
+    #os.makedirs('dummy', exist_ok=True)
+    #utils.save_img(y, 'dummy/warp.png')
