@@ -13,7 +13,7 @@ Example::
 >>> import torch
 >>> import core
 >>> x = torch.arange(16).float().view(1, 1, 4, 4)
->>> y = core.imresize(x, sides=(3, 3))
+>>> y = core.imresize(x, sizes=(3, 3))
 >>> print(y)
 tensor([[[[ 0.7506,  2.1004,  3.4503],
           [ 6.1505,  7.5000,  8.8499],
@@ -270,7 +270,7 @@ def cast_output(x: torch.Tensor, dtype: _D) -> torch.Tensor:
 def resize_1d(
         x: torch.Tensor,
         dim: int,
-        side: typing.Optional[int]=None,
+        size: typing.Optional[int]=None,
         kernel: str='cubic',
         sigma: float=2.0,
         padding_type: str='reflect',
@@ -281,11 +281,11 @@ def resize_1d(
         x (torch.Tensor): A torch.Tensor of dimension (B x C, 1, H, W).
         dim (int):
         scale (float):
-        side (int):
+        size (int):
 
     Return:
     '''
-    scale = side / x.size(dim)
+    scale = size / x.size(dim)
     # Identity case
     if scale == 1:
         return x
@@ -302,17 +302,17 @@ def resize_1d(
     else:
         antialiasing_factor = 1
 
-    # We allow margin to both sides
+    # We allow margin to both sizes
     kernel_size += 2
 
     # Weights only depend on the shape of input and output,
     # so we do not calculate gradients here.
     with torch.no_grad():
-        d = 1 / (2 * side)
+        d = 1 / (2 * size)
         pos = torch.linspace(
             start=d,
             end=(1 - d),
-            steps=side,
+            steps=size,
             dtype=x.dtype,
             device=x.device,
         )
@@ -371,7 +371,7 @@ def downsampling_2d(
 def imresize(
         x: torch.Tensor,
         scale: typing.Optional[float]=None,
-        sides: typing.Optional[typing.Tuple[int, int]]=None,
+        sizes: typing.Optional[typing.Tuple[int, int]]=None,
         kernel: typing.Union[str, torch.Tensor]='cubic',
         sigma: float=2,
         rotation_degree: float=0,
@@ -382,7 +382,7 @@ def imresize(
     Args:
         x (torch.Tensor):
         scale (float):
-        sides (tuple(int, int)):
+        sizes (tuple(int, int)):
         kernel (str, default='cubic'):
         sigma (float, default=2):
         rotation_degree (float, default=0):
@@ -393,16 +393,16 @@ def imresize(
         torch.Tensor:
     '''
 
-    if scale is None and sides is None:
-        raise ValueError('One of scale or sides must be specified!')
-    if scale is not None and sides is not None:
-        raise ValueError('Please specify scale or sides to avoid conflict!')
+    if scale is None and sizes is None:
+        raise ValueError('One of scale or sizes must be specified!')
+    if scale is not None and sizes is not None:
+        raise ValueError('Please specify scale or sizes to avoid conflict!')
 
     x, b, c, h, w = reshape_input(x)
 
-    if sides is None:
+    if sizes is None:
         # Determine output size
-        sides = (math.ceil(h * scale), math.ceil(w * scale))
+        sizes = (math.ceil(h * scale), math.ceil(w * scale))
         scale_inv = 1 / scale
         if isinstance(kernel, str) and scale_inv.is_integer():
             kernel = discrete_kernel(kernel, scale, antialiasing=antialiasing)
@@ -423,8 +423,8 @@ def imresize(
             'antialiasing': antialiasing,
         }
         # Core resizing module
-        x = resize_1d(x, -2, side=sides[0], **kwargs)
-        x = resize_1d(x, -1, side=sides[1], **kwargs)
+        x = resize_1d(x, -2, size=sizes[0], **kwargs)
+        x = resize_1d(x, -1, size=sizes[1], **kwargs)
     elif isinstance(kernel, torch.Tensor):
         x = downsampling_2d(x, kernel, scale=int(1 / scale))
 
@@ -451,9 +451,9 @@ if __name__ == '__main__':
     a[..., -1, -2] = 1
     a[..., -1, 0] = 100
     '''
-    #b = imresize(a, sides=(3, 8), antialiasing=False)
-    #c = imresize(a, sides=(11, 13), antialiasing=True)
-    #c = imresize(a, sides=(4, 4), antialiasing=False, kernel='gaussian', sigma=1)
+    #b = imresize(a, sizes=(3, 8), antialiasing=False)
+    #c = imresize(a, sizes=(11, 13), antialiasing=True)
+    #c = imresize(a, sizes=(4, 4), antialiasing=False, kernel='gaussian', sigma=1)
     #print(a)
     #print(b)
     #print(c)
@@ -462,5 +462,5 @@ if __name__ == '__main__':
     #print(r)
     '''
     a = torch.arange(225).float().view(1, 1, 15, 15)
-    imresize(a, sides=[5, 5])
+    imresize(a, sizes=[5, 5])
     '''

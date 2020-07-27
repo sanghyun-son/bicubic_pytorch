@@ -69,7 +69,7 @@ if cuda.is_available():
 x_resized_1 = core.imresize(x, scale=0.456)
 
 # Resize by resolution (456, 321) -> (123, 456)
-x_resized_2 = core.imresize(x, sides=(123, 456))
+x_resized_2 = core.imresize(x, sizes=(123, 456))
 
 # Resize without antialiasing (Not compatible with MATLAB)
 x_resized_3 = core.imresize(x, scale=0.456, antialiasing=False)

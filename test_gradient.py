@@ -42,7 +42,7 @@ class TestGradient(unittest.TestCase):
 
         for i in range(self.n_iters):
             optimizer.zero_grad()
-            noise_up = core.imresize(noise_p, sides=self.target_size)
+            noise_up = core.imresize(noise_p, size=self.target_size)
             loss = F.mse_loss(noise_up, self.target)
             loss.backward()
             if i == 0 or (i + 1) % 20 == 0:
