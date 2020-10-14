@@ -245,7 +245,6 @@ def reshape_output(
     return x
 
 def cast_input(x: torch.Tensor) -> typing.Tuple[torch.Tensor, _D]:
-
     if x.dtype != torch.float32 or x.dtype != torch.float64:
         dtype = x.dtype
         x = x.float()
@@ -255,7 +254,6 @@ def cast_input(x: torch.Tensor) -> typing.Tuple[torch.Tensor, _D]:
     return x, dtype
 
 def cast_output(x: torch.Tensor, dtype: _D) -> torch.Tensor:
-
     if dtype is not None:
         if not dtype.is_floating_point:
             x = x.round()
