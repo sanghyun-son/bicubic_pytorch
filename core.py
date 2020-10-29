@@ -4,7 +4,7 @@ The resulting values are the same to MATLAB function imresize('bicubic').
 
 ## Author:      Sanghyun Son
 ## Email:       sonsang35@gmail.com (primary), thstkdgus35@snu.ac.kr (secondary)
-## Version:     1.1.0
+## Version:     1.2.0
 ## Last update: July 9th, 2020 (KST)
 
 Depencency: torch
@@ -306,20 +306,6 @@ def resize_1d(
     # Weights only depend on the shape of input and output,
     # so we do not calculate gradients here.
     with torch.no_grad():
-        '''
-        d = 1 / (2 * scale * x.size(dim))
-        pos = torch.linspace(
-            start=d,
-            end=(1 - d),
-            steps=size,
-            dtype=x.dtype,
-            device=x.device,
-        )
-        pos = x.size(dim) * pos - 0.5
-        base = pos.floor() - (kernel_size // 2) + 1
-        dist = pos - base
-        print(dist)
-        '''
         pos = torch.linspace(
             0, size - 1, steps=size, dtype=x.dtype, device=x.device,
         )
@@ -408,6 +394,7 @@ def imresize(
     x, b, c, h, w = reshape_input(x)
 
     if sizes is None:
+        '''
         # Check if we can apply the convolution algorithm
         scale_inv = 1 / scale
         if isinstance(kernel, str) and scale_inv.is_integer():
@@ -417,7 +404,7 @@ def imresize(
                 'An integer downsampling factor '
                 'should be used with a predefined kernel!'
             )
-
+        '''
         # Determine output size
         sizes = (math.ceil(h * scale), math.ceil(w * scale))
         scales = (scale, scale)

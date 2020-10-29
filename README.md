@@ -13,6 +13,10 @@ The merits of our implementation are:
 * Very fast, support GPU acceleration and batching.
 * Fully differentiable with respect to input and output images.
 
+## Updates
+
+Previous version had some trouble with fractional scale factors (It was okay to select the output sizes which can result to fractional scale factors).
+Version 1.2.0 fixes the issue and improves the accuracy.
 
 ## Environment and Dependency
 
