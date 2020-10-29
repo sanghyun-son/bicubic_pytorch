@@ -268,7 +268,8 @@ def cast_output(x: torch.Tensor, dtype: _D) -> torch.Tensor:
 def resize_1d(
         x: torch.Tensor,
         dim: int,
-        size: typing.Optional[int]=None,
+        size: typing.Optional[int],
+        scale: typing.Optional[float],
         kernel: str='cubic',
         sigma: float=2.0,
         padding_type: str='reflect',
@@ -283,7 +284,6 @@ def resize_1d(
 
     Return:
     '''
-    scale = size / x.size(dim)
     # Identity case
     if scale == 1:
         return x
@@ -306,7 +306,8 @@ def resize_1d(
     # Weights only depend on the shape of input and output,
     # so we do not calculate gradients here.
     with torch.no_grad():
-        d = 1 / (2 * size)
+        '''
+        d = 1 / (2 * scale * x.size(dim))
         pos = torch.linspace(
             start=d,
             end=(1 - d),
@@ -315,6 +316,14 @@ def resize_1d(
             device=x.device,
         )
         pos = x.size(dim) * pos - 0.5
+        base = pos.floor() - (kernel_size // 2) + 1
+        dist = pos - base
+        print(dist)
+        '''
+        pos = torch.linspace(
+            0, size - 1, steps=size, dtype=x.dtype, device=x.device,
+        )
+        pos = (pos + 0.5) / scale - 0.5
         base = pos.floor() - (kernel_size // 2) + 1
         dist = pos - base
         weight = get_weight(
@@ -399,8 +408,7 @@ def imresize(
     x, b, c, h, w = reshape_input(x)
 
     if sizes is None:
-        # Determine output size
-        sizes = (math.ceil(h * scale), math.ceil(w * scale))
+        # Check if we can apply the convolution algorithm
         scale_inv = 1 / scale
         if isinstance(kernel, str) and scale_inv.is_integer():
             kernel = discrete_kernel(kernel, scale, antialiasing=antialiasing)
@@ -409,6 +417,13 @@ def imresize(
                 'An integer downsampling factor '
                 'should be used with a predefined kernel!'
             )
+
+        # Determine output size
+        sizes = (math.ceil(h * scale), math.ceil(w * scale))
+        scales = (scale, scale)
+
+    if scale is None:
+        scales = (sizes[0] / h, sizes[1] / w)
 
     x, dtype = cast_input(x)
 
@@ -421,8 +436,8 @@ def imresize(
             'antialiasing': antialiasing,
         }
         # Core resizing module
-        x = resize_1d(x, -2, size=sizes[0], **kwargs)
-        x = resize_1d(x, -1, size=sizes[1], **kwargs)
+        x = resize_1d(x, -2, size=sizes[0], scale=scales[0], **kwargs)
+        x = resize_1d(x, -1, size=sizes[1], scale=scales[1], **kwargs)
     elif isinstance(kernel, torch.Tensor):
         x = downsampling_2d(x, kernel, scale=int(1 / scale))
 
