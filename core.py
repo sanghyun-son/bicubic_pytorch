@@ -369,7 +369,8 @@ def imresize(
         sigma: float=2,
         rotation_degree: float=0,
         padding_type: str='reflect',
-        antialiasing: bool=True) -> torch.Tensor:
+        antialiasing: bool=True,
+        range_8bit: bool=False) -> torch.Tensor:
 
     '''
     Args:
@@ -423,8 +424,17 @@ def imresize(
             'antialiasing': antialiasing,
         }
         # Core resizing module
-        x = resize_1d(x, -2, size=sizes[0], scale=scales[0], **kwargs)
-        x = resize_1d(x, -1, size=sizes[1], scale=scales[1], **kwargs)
+        if scales[0] < scales[1]:
+            order = ((-2, 0), (-1, 1))
+        else:
+            order = ((-1, 1), (-2, 0))
+
+        for dim, idx in order:
+            x = resize_1d(x, dim, size=sizes[idx], scale=scales[idx], **kwargs)
+            if range_8bit:
+                x = (x + 0.5).floor()
+                x = x.clamp(min=0, max=255)
+
     elif isinstance(kernel, torch.Tensor):
         x = downsampling_2d(x, kernel, scale=int(1 / scale))
 
